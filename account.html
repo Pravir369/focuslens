@@ -13,7 +13,7 @@
   <p class="eyebrow">FocusLens · Accounts</p>
   <h1>A place for your progress.</h1>
   <p class="intro">Create an account or sign in. Your account is saved on this service.</p>
-  <p class="notice">Account preview. Study sessions still run in the original app; account-backed study history is coming next. Your existing browser history stays intact.</p>
+  <p class="notice">Your completed study sessions sync to this account. Camera footage, images, and head-pose readings stay on your device. Old local summaries and pacing can be imported without inventing events.</p>
   <p id="account-status" role="status" aria-live="polite">Ready when you are.</p>
   <p id="account-error" role="alert" hidden></p>
   <section id="auth-forms" class="card" aria-label="Account access">
@@ -52,7 +52,28 @@
   <section id="signed-in" class="card" aria-labelledby="signed-in-title" hidden>
     <h2 id="signed-in-title">You’re signed in.</h2>
     <p id="current-name"></p><p id="current-email"></p><p id="current-role" class="muted"></p>
-    <p class="muted">This preview verifies account access. It does not upload camera images or import your old history yet.</p>
+    <p><a class="button-link" href="/study">Open study session</a></p>
     <button id="sign-out" type="button">Sign out</button>
+  </section>
+  <section id="account-dashboard" class="card" hidden>
+    <h2>Your study history</h2>
+    <p id="dashboard-status" role="status"></p><p id="account-pacing" class="muted"></p>
+    <p id="account-history-empty">No saved sessions yet.</p>
+    <div class="account-table"><table><thead><tr><th>Ended</th><th>Study time</th><th>Engagement</th><th>Recovery</th></tr></thead><tbody id="account-history"></tbody></table></div>
+    <button id="refresh-account-history" type="button">Refresh history</button>
+    <h3>Import old history</h3>
+    <p class="muted">History in this browser is imported on sign-in when available. To move history from the old localhost app, use its Export old history button, then select that JSON file here. Imported summaries remain marked as legacy; no events are invented. Files from another browser address stay intact after import.</p>
+    <label for="legacy-import-file">FocusLens history export</label><input id="legacy-import-file" type="file" accept="application/json,.json">
+    <h3>Family links</h3><p id="family-links" class="muted"></p>
+    <form id="family-link-form" hidden><label for="student-email">Student’s account email</label><input id="student-email" type="email" required><button type="submit">Link student</button></form>
+    <p id="account-email-status" class="muted"></p>
+    <details><summary>Optional desktop app monitoring · macOS</summary>
+      <p class="muted">Download the desktop helper and open connect-monitor.command on your Mac. Generate a pairing code below and enter it in the helper. The code expires in two minutes. Pairing lasts up to four hours and can be revoked anytime.</p>
+      <p class="muted">The helper reads app names only while an enabled, unpaused study session has a fresh lease. It cannot read your history or send email, and never reads screenshots, window titles, or browser tabs.</p>
+      <p><a href="/downloads/FocusLens-monitor.zip">Download desktop helper</a></p>
+      <button id="pair-monitor" type="button">Generate pairing code</button>
+      <output id="monitor-pair-code" class="pair-code"></output>
+      <button id="revoke-monitor" type="button">Disconnect desktop helpers</button>
+    </details>
   </section>
 </main></body></html>

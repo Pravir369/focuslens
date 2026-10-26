@@ -10,7 +10,8 @@ from google.oauth2 import id_token
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy.exc import IntegrityError
 
-from .auth import json_fields, normalized_email, password_bytes
+from .auth import json_fields, normalized_email, password_bytes, authentication_result
+from .legacy import LEGACY_FIELDS
 from .models import db, User
 from .tokens import issue_token
 
@@ -52,7 +53,7 @@ def authenticate_google():
     if not current_app.config["GOOGLE_CLIENT_ID"]:
         return jsonify(error="Google sign-in is not configured on this service."), 503
     try:
-        data = json_fields({"idToken", "role", "password"})
+        data = json_fields({"idToken", "role", "password"} | LEGACY_FIELDS)
         token = data.get("idToken")
         if not isinstance(token, str) or not 1 <= len(token) <= 8192:
             raise ValueError("Choose your Google account again.")
@@ -116,7 +117,7 @@ def authenticate_google():
     except IntegrityError:
         db.session.rollback()
         return jsonify(error="Account access changed. Please sign in again."), 409
-    response = jsonify(issue_token(user))
+    response = jsonify(authentication_result(user,data))
     response.status_code = 201 if created else 200
     response.delete_cookie(COOKIE, path="/auth/google", secure=current_app.config["PRODUCTION"], httponly=True, samesite="Strict")
     return response

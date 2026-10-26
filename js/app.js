@@ -195,7 +195,7 @@ export function boot(loadVision, overrides = {}) {
     if (phase !== "start" && phase !== "summary") return;
     historyReturnView = phase;
     history.load(); refreshHistory();
-    set("status", "History stays in this browser on this device.");
+    set("status", history.description ?? "History stays in this browser on this device.");
     showView("history");
   }
   function renderSetupPlan() {
@@ -574,6 +574,7 @@ export function boot(loadVision, overrides = {}) {
     session = nextSession; finalized = false;
     reports.setSession(null);
     resetEvidence(); session.start(at());
+    deps.onSessionStarted?.(session);
     windows.start(deps.makeSessionId(), { enabled: ui["window-enabled"].checked,
       allowedApps: ui["allowed-apps"].value.split(/[,\n]/).map((name) => name.trim()).filter(Boolean).slice(0, 20) });
     ui["enable-audio"].hidden = enabled;
@@ -675,5 +676,5 @@ export function boot(loadVision, overrides = {}) {
   listen(host, "pagehide", dispose);
   set("profile-status", profile.message);
   renderCalibration(deps.now()); renderLog(); refreshHistory(); renderSetupPlan(); showView("start");
-  return { dispose };
+  return { dispose, endSession() { if (session && session.state !== "ended") { session.end(at()); finalizeSession(); } } };
 }

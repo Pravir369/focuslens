@@ -19,6 +19,12 @@ button:disabled { cursor: wait; opacity: .6; }
 :focus-visible { outline: 3px solid #91b8fc; outline-offset: 3px; }
 #account-error { color: #8a2828; background: #fff0ec; padding: 14px; border-radius: 6px; }
 .muted { font-size: .9rem; }
+.button-link { display: inline-block; padding: 12px 20px; border-radius: 6px; background: #28664e; color: white; font-weight: 600; text-decoration: none; }
+.account-table { overflow-x: auto; margin: 20px 0; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+td, th { border-bottom: 1px solid #d7e2d9; padding: 10px; text-align: left; }
+.pair-code { display: block; overflow-wrap: anywhere; font-family: monospace; margin: 16px 0; }
+details { margin-top: 24px; } summary { cursor: pointer; font-weight: 600; }
 .google-option label { margin-top: 0; }
 .google-option select { margin-bottom: 18px; }
 #google-button { min-height: 44px; }

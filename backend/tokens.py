@@ -7,12 +7,12 @@ from flask import current_app, g, jsonify, request
 from .models import db, User
 
 
-def issue_token(user):
+def issue_token(user, *, purpose="account", device_id=None):
     now = datetime.now(timezone.utc)
-    expires = now + timedelta(seconds=current_app.config["JWT_LIFETIME_SECONDS"])
+    expires = now + timedelta(seconds=min(14400,current_app.config["JWT_LIFETIME_SECONDS"]) if purpose=="monitor" else current_app.config["JWT_LIFETIME_SECONDS"])
     token = jwt.encode({"userId": user.id, "sub": user.id, "role": user.role,
         "iat": now, "nbf": now, "exp": expires, "iss": current_app.config["JWT_ISSUER"],
-        "aud": current_app.config["JWT_AUDIENCE"], "jti": str(uuid.uuid4())},
+        "aud": current_app.config["JWT_AUDIENCE"], "jti": str(uuid.uuid4()), "purpose": purpose, "deviceId": device_id},
         current_app.config["JWT_SECRET_KEY"], algorithm="HS256")
     return {"token": token, "tokenType": "Bearer", "expiresAt": expires.isoformat(), "user": user.public()}
 
@@ -44,7 +44,13 @@ def require_auth(handler):
         # retain access just because an otherwise valid old token still exists.
         user = db.session.get(User, user_id)
         if user is None or user.role != claims["role"]: return unauthorized()
+        purpose=claims.get("purpose","account")
+        if purpose not in ("account","monitor"): return unauthorized()
+        if purpose=="monitor":
+            permitted=(request.endpoint,request.method) in {("data.monitor_config","GET"),("data.window_status","POST")}
+            if not permitted or not isinstance(claims.get("deviceId"),str) or not current_app.extensions["account_services"].device_active(user.id,claims["deviceId"]): return unauthorized()
         g.user_id = user.id
         g.user = user
+        g.auth_purpose = purpose
         return handler(*args, **kwargs)
     return authenticated

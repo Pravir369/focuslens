@@ -1,5 +1,7 @@
 // Keep the bearer token out of URLs, HTML, logs, and persistent localStorage.
 import { bootGoogleSignIn } from "./google-signin.js";
+import { legacySnapshot, acknowledgeLegacy } from "./legacy-import.js";
+import { bootAccountDashboard } from "./account-dashboard.js";
 const TOKEN_KEY = "focuslens.auth.token.v1";
 
 export class AccountClient {
@@ -33,8 +35,10 @@ export class AccountClient {
     const generation = ++this.generation;
     const abort = new AbortController(); this.abort = abort;
     const timeout = setTimeout(() => abort.abort(), 20000);
+    let legacy;
+    try { legacy=legacySnapshot(); } catch { this.migrationMessage="Old history could not be read. Your original browser data was kept."; }
     try {
-      const response = await this.fetcher(`/auth/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields), signal: abort.signal, credentials: kind === "google" ? "same-origin" : "omit" });
+      const response = await this.fetcher(`/auth/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...fields, ...legacy?.payload }), signal: abort.signal, credentials: kind === "google" ? "same-origin" : "omit" });
       const data = await response.json();
       if (generation !== this.generation) return null;
       if (!response.ok) {
@@ -44,6 +48,10 @@ export class AccountClient {
       }
       if (typeof data.token !== "string" || !data.user) throw new Error("Invalid account response.");
       this.save(data.token);
+      if (data.migration?.status==="complete") {
+        try { this.migrationMessage=acknowledgeLegacy(legacy,data.migration)?"Your old history was imported into this account.":"Your old history was imported. Newer browser data was preserved for a later import."; }
+        catch { this.migrationMessage="Your old history was imported, but originals could not be cleared. Retrying is safe."; }
+      } else if (data.migration) this.migrationMessage=data.migration.error;
       return data.user;
     } finally { clearTimeout(timeout); }
   }
@@ -53,6 +61,7 @@ export function bootAccount(doc = document, client = new AccountClient()) {
   const get = (id) => doc.getElementById(id);
   let busy = false;
   let googleSignIn;
+  const dashboard = bootAccountDashboard(doc,client);
   function status(message) { get("account-status").textContent = message; }
   function error(message) { get("account-error").textContent = message || ""; get("account-error").hidden = !message; }
   function signedIn(user) {
@@ -60,6 +69,7 @@ export function bootAccount(doc = document, client = new AccountClient()) {
     get("auth-forms").hidden = Boolean(user); get("signed-in").hidden = !user;
     for (const [id, value] of [["current-name", user?.displayName], ["current-email", user?.email], ["current-role", user?.role]]) get(id).textContent = value || "";
     status(user ? client.storageAvailable ? "Signed in on this browser tab." : "Signed in for this page. Browser storage is unavailable." : "Ready when you are.");
+    void dashboard.setUser(user);
   }
   function setBusy(value) {
     busy = value;

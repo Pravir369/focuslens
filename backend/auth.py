@@ -11,8 +11,16 @@ from sqlalchemy.exc import IntegrityError
 
 from .models import db, User
 from .tokens import issue_token, require_auth
+from .legacy import LEGACY_FIELDS, maybe_import
 
 auth = Blueprint("auth", __name__, url_prefix="/auth")
+
+
+def authentication_result(user, data):
+    result=issue_token(user)
+    migration=maybe_import(user,data)
+    if migration is not None: result["migration"]=migration
+    return result
 
 
 class AuthLimiter:
@@ -69,7 +77,7 @@ def limit_attempts():
 @auth.post("/signup")
 def signup():
     try:
-        data = json_fields({"email", "password", "displayName", "role"})
+        data = json_fields({"email", "password", "displayName", "role"} | LEGACY_FIELDS)
         email = normalized_email(data.get("email"))
         password = password_bytes(data.get("password"))
         name = data.get("displayName")
@@ -81,7 +89,7 @@ def signup():
                     password_hash=bcrypt.hashpw(password, bcrypt.gensalt(current_app.config["BCRYPT_ROUNDS"])))
         db.session.add(user)
         db.session.commit()
-        return jsonify(issue_token(user)), 201
+        return jsonify(authentication_result(user,data)), 201
     except ValueError as error:
         return jsonify(error=str(error)), 400
     except IntegrityError:
@@ -92,7 +100,7 @@ def signup():
 @auth.post("/login")
 def login():
     try:
-        data = json_fields({"email", "password"})
+        data = json_fields({"email", "password"} | LEGACY_FIELDS)
     except ValueError as error:
         return jsonify(error=str(error)), 400
     try:
@@ -104,7 +112,7 @@ def login():
     valid = bcrypt.checkpw(password, candidate)
     if not user or not user.password_hash or not valid:
         return jsonify(error="Invalid credentials."), 401
-    return jsonify(issue_token(user))
+    return jsonify(authentication_result(user,data))
 
 
 @auth.get("/me")

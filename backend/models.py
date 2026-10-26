@@ -77,6 +77,8 @@ class StudySession(db.Model):
     unclassified_periods = db.Column(db.JSON, nullable=True)
     import_source = db.Column(db.String(20), nullable=False, default="live")
     legacy_key = db.Column(db.String(64), nullable=True)
+    end_reason = db.Column(db.String(20), nullable=True)
+    completion_key = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
     __table_args__ = (
         UniqueConstraint("user_id", "legacy_key"),
@@ -105,6 +107,7 @@ class Event(db.Model):
     start_time = db.Column(db.BigInteger, nullable=False)
     end_time = db.Column(db.BigInteger, nullable=False)
     duration_ms = db.Column(db.BigInteger, nullable=False)
+    position = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     __table_args__ = (
         CheckConstraint("type IN ('engaged', 'distracted', 'drowsy', 'away')", name="valid_type"),
         CheckConstraint("trigger_source IS NULL OR (type = 'distracted' AND trigger_source IN ('cameraA', 'cameraB', 'window'))", name="valid_source"),

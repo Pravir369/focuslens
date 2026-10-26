@@ -1,9 +1,11 @@
 """Phase 2 Flask application factory. Phase 1 remains a local-only app."""
 from pathlib import Path
+from io import BytesIO
 import logging
+import zipfile
 from urllib.parse import urlsplit
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -30,7 +32,7 @@ def create_app(test_config=None):
         JWT_LIFETIME_SECONDS=7 * 24 * 60 * 60, BCRYPT_ROUNDS=12,
         PRODUCTION=production, PUBLIC_ORIGIN=origin, TRUST_PROXY=env.get("TRUST_PROXY") == "1",
         TRUSTED_HOSTS=[urlsplit(origin).hostname] if production else ["localhost", "127.0.0.1"],
-        MAX_CONTENT_LENGTH=16384, AUTH_RATE_LIMIT=20, AUTH_RATE_WINDOW=60,
+        MAX_CONTENT_LENGTH=2097152, AUTH_RATE_LIMIT=20, AUTH_RATE_WINDOW=60,
         GOOGLE_CLIENT_ID=env.get("GOOGLE_CLIENT_ID", ""), GOOGLE_NONCE_SECONDS=600,
     )
     if test_config: app.config.update(test_config)
@@ -53,9 +55,18 @@ def create_app(test_config=None):
     register_auth(app)
     from .google_auth import google_auth
     app.register_blueprint(google_auth)
+    from .services import Services
+    from .data import api
+    app.extensions["account_services"] = Services(env,app.config.get("REPORT_SENDER"))
+    app.register_blueprint(api)
 
     @app.before_request
     def transport_and_origin():
+        # Preserve the small auth-body limit; history import is bounded separately.
+        if request.path in ("/auth/login","/auth/signup","/auth/google") and (request.content_length or 0)>16384:
+            data=request.get_json(silent=True) if request.is_json else None
+            if not isinstance(data,dict) or not {"localProfileId","localSessionHistory","localPacingHistory"}.intersection(data):
+                return jsonify(error="Account request is too large."),413
         if app.config["PRODUCTION"] and not request.is_secure:
             return jsonify(error="HTTPS is required."), 426
         origin = request.headers.get("Origin")
@@ -70,6 +81,8 @@ def create_app(test_config=None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin" if app.config["PRODUCTION"] else "no-referrer-when-downgrade"
         response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        if request.path=="/study" or request.path.startswith("/js/") or request.path=="/tests/account-study-browser.html":
+            response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/; style-src 'self'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/ https://storage.googleapis.com/mediapipe-models/; worker-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; manifest-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         if app.config["PRODUCTION"]: response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
@@ -87,7 +100,7 @@ def create_app(test_config=None):
 
     @app.get("/health")
     def health():
-        return jsonify(app="FocusLens Accounts", phase=2, checkpoint="google-auth")
+        return jsonify(app="FocusLens Accounts", phase=2, checkpoint="account-study")
 
     @app.get("/")
     @app.get("/account.html")
@@ -96,8 +109,38 @@ def create_app(test_config=None):
 
     @app.get("/assets/<path:name>")
     def account_assets(name):
-        allowed = {"account.js": ROOT / "js", "google-signin.js": ROOT / "js", "account.css": ROOT, "icon-192.png": ROOT}
+        allowed = {path.name: ROOT / "js" for path in (ROOT/"js").glob("*.js")}
+        allowed.update({"account.css": ROOT,"icon-192.png":ROOT})
         if name not in allowed: return jsonify(error="Not found."), 404
         return send_from_directory(allowed[name], name)
+
+    @app.get("/study")
+    def study_page(): return send_from_directory(ROOT,"index.html")
+
+    @app.get("/js/<name>")
+    def study_asset(name):
+        if name not in {path.name for path in (ROOT/"js").glob("*.js")}: return jsonify(error="Not found."),404
+        return send_from_directory(ROOT/"js",name)
+
+    @app.get("/<name>")
+    def public_asset(name):
+        if name not in {"styles.css","manifest.json","icon-192.png","icon-512.png"}: return jsonify(error="Not found."),404
+        return send_from_directory(ROOT,name)
+
+    @app.get("/downloads/FocusLens-monitor.zip")
+    def monitor_download():
+        buffer=BytesIO()
+        with zipfile.ZipFile(buffer,"w",zipfile.ZIP_DEFLATED) as archive:
+            for name in ("account_monitor.py","window_monitor.py","window_rules.py","connect-monitor.command"):
+                archive.write(ROOT/name,arcname="FocusLens-monitor/"+name)
+            archive.writestr("FocusLens-monitor/server.txt",app.config["PUBLIC_ORIGIN"])
+        buffer.seek(0)
+        return send_file(buffer,mimetype="application/zip",as_attachment=True,download_name="FocusLens-monitor.zip")
+
+    if not app.config["PRODUCTION"]:
+        @app.get("/tests/<name>")
+        def local_browser_check(name):
+            if name not in {"account-study-browser.html","account-study-browser.mjs"}: return jsonify(error="Not found."),404
+            return send_from_directory(ROOT/"tests",name)
 
     return app

@@ -239,10 +239,6 @@
     <footer>Distraction is normal. A fresh start is always available.</footer>
   </main>
   <noscript><p>FocusLens requires JavaScript to process your camera on this device.</p></noscript>
-  <script type="module">
-    import { boot } from "./js/app.js?v=7.4";
-    import { MEDIAPIPE_MODULE_URL } from "./js/config.js";
-    boot(() => import(MEDIAPIPE_MODULE_URL));
-  </script>
+  <script type="module" src="./js/entry.js"></script>
 </body>
 </html>

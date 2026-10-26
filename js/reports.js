@@ -64,8 +64,8 @@ export class ReportController {
         if (!response.ok) throw new Error(data.error || "Delivery status could not be read.");
       }
       if (generation !== this.generation) return;
-      if (data.status !== "sent") throw new Error(data.error || "Delivery was not confirmed. Check your inbox before retrying.");
-      this.output.textContent = `Report sent to ${data.sentCount} ${data.sentCount === 1 ? "address" : "addresses"}.`;
+      if (data.status !== "sent" && data.status !== "accepted") throw new Error(data.error || "Delivery was not confirmed. Check your inbox before retrying.");
+      this.output.textContent = data.status === "accepted" ? `Email service accepted the report for ${data.sentCount} ${data.sentCount === 1 ? "address" : "addresses"}. Check the inbox for delivery.` : `Report sent to ${data.sentCount} ${data.sentCount === 1 ? "address" : "addresses"}.`;
       this.form.reset();
     } catch (error) {
       if (generation === this.generation) this.output.textContent = error.name === "AbortError"
