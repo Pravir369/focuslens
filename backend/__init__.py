@@ -144,7 +144,7 @@ def create_app(test_config=None):
 
     @app.get("/fonts/<name>")
     def font_asset(name):
-        if name not in {"inter-latin-var.woff2", "manrope-latin-var.woff2"}: return jsonify(error="Not found."), 404
+        if name not in {"hanken-grotesk-latin-var.woff2", "inter-latin-var.woff2", "manrope-latin-var.woff2"}: return jsonify(error="Not found."), 404
         return send_from_directory(ROOT / "fonts", name)
 
     @app.get("/study")
