@@ -1,4 +1,4 @@
-import { MEDIAPIPE_WASM_URL, PHONE_MODEL_URL, PHONE_CONFIDENCE_THRESHOLD } from "./config.js";
+import { MEDIAPIPE_WASM_URL, PHONE_MODEL_URL, PHONE_CONFIDENCE_THRESHOLD, PERSON_CONFIDENCE_THRESHOLD } from "./config.js";
 import { atStage, loadModelBuffer } from "./loading.js";
 
 export async function createPhoneDetector({ ObjectDetector, FilesetResolver }, { onStage = () => {}, fetcher, canvas } = {}) {
@@ -10,7 +10,9 @@ export async function createPhoneDetector({ ObjectDetector, FilesetResolver }, {
   return atStage("runtime", () => ObjectDetector.createFromOptions(fileset, {
     ...(canvas ? { canvas } : {}),
     baseOptions: { modelAssetBuffer, delegate: "CPU" },
-    runningMode: "VIDEO", categoryAllowlist: ["cell phone"],
-    scoreThreshold: PHONE_CONFIDENCE_THRESHOLD,
+    runningMode: "VIDEO", categoryAllowlist: ["cell phone", "person"],
+    // Each category is filtered again at its own threshold in the result
+    // readers. Both use one inference, one worker and the existing frame cap.
+    scoreThreshold: Math.min(PHONE_CONFIDENCE_THRESHOLD, PERSON_CONFIDENCE_THRESHOLD),
   }));
 }

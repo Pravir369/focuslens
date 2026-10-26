@@ -2,6 +2,7 @@ import { MEDIAPIPE_MODULE_URL } from "./config.js";
 import { atStage } from "./loading.js";
 import { createPhoneDetector } from "./phone-model.js";
 import { readPhoneResult } from "./phone.js";
+import { readPersonResult } from "./presence.js";
 import { installWorkerRuntimeImport } from "./worker-runtime.js";
 
 let detector = null;
@@ -28,6 +29,7 @@ self.onmessage = async ({ data }) => {
       // inference timestamp. The evidence keeps its original capture time.
       const result = detector.detectForVideo(bitmap, inferenceAt);
       const sample = readPhoneResult(result, bitmap.width, bitmap.height, capturedAt);
+      if (source === 'cameraA') sample.person = readPersonResult(result, bitmap.width, bitmap.height, capturedAt);
       self.postMessage({ type: "result", id, generation, source, sample });
     } catch (error) {
       self.postMessage({ type: "error", source, id, generation, stage: "phone-inference", message: error.message });

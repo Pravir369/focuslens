@@ -1,6 +1,7 @@
 import { DWELL_MS, EYE_CLOSED_THRESHOLD, MAX_FRAME_GAP_MS } from "./config.js";
 import { angleDifference } from "./pose.js";
 import { phoneEvidence } from "./phone.js";
+import { personEvidence } from './presence.js';
 
 export function inZone(pose, zone) {
   return Boolean(pose && zone
@@ -8,8 +9,20 @@ export function inZone(pose, zone) {
     && Math.abs(angleDifference(pose.pitch, zone.pitch)) <= zone.pitchTolerance);
 }
 
-export function classifyObservation(frame, calibration, { phonePolicy = "phone-allowed", phoneSample = null, deskPhoneSample = null, now } = {}) {
-  if (!frame.faceDetected) return { state: "away", reason: "No face detected" };
+export function classifyObservation(frame, calibration, { phonePolicy = "phone-allowed", phoneSample = null, deskPhoneSample = null, presenceEnabled = false, now } = {}) {
+  if (!frame.faceDetected) {
+    // Landmarks often disappear in profile. In the presence-enabled path,
+    // distinguish a seated person from an empty view instead of inventing a
+    // break whenever the face tracker loses the direction of the face.
+    if (presenceEnabled) {
+      if (!calibration) return { state: null, reason: 'Calibration required' };
+      const person = personEvidence(phoneSample, now);
+      if (person.status === 'unknown') return { state: null, reason: 'Face not visible · waiting for fresh person detection' };
+      if (person.status === 'present') return { state: 'distracted', reason: 'Face not visible · person still present in Camera A' };
+      return { state: 'away', reason: 'No face or person detected in Camera A' };
+    }
+    return { state: "away", reason: "No face detected" };
+  }
   // Missing pose/blendshapes is an unusable sample, not evidence of distraction.
   if (!frame.pose || !Number.isFinite(frame.eyeClosedScore)) return { state: null, reason: "Waiting for usable face readings" };
   if (frame.eyeClosedScore > EYE_CLOSED_THRESHOLD) return { state: "eyes_closed", reason: "Eyes closed" };

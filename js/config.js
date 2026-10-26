@@ -24,4 +24,8 @@ export const PHONE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/
 export const PHONE_SAMPLE_INTERVAL_MS = 250;
 export const PHONE_CONFIDENCE_THRESHOLD = 0.55;
 export const PHONE_FRESHNESS_MS = 750;
+// Presence is separate from phone use. Starting values need a real-camera
+// check with the student's head/upper body in Camera A's view.
+export const PERSON_CONFIDENCE_THRESHOLD = 0.45;
+export const PERSON_FRESHNESS_MS = 750;
 export const PHONE_LOAD_TIMEOUT_MS = 45000;

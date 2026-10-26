@@ -101,6 +101,8 @@ Open **http://localhost:8000/** in your working browser. Do not open the HTML fi
 
 ## Session flow
 
+Phone-free now uses the shared local object model to distinguish a person still seated with an untrackable face from an empty view. After the existing dwell, these become Distracted and Away respectively; stale presence readings are unclassified. Diagnostics includes Camera A person presence/confidence/age. Frame the head and upper body and manually test a sustained head turn, then leaving the view. The phone threshold stays unchanged. Studying with phone retains its face-only/no-object-model behavior pending approval to change that earlier requirement. See `SPEC.md` Section 5.2.2.
+
 1. **Start:** choose Phone-free (default) or Studying with phone, then Begin and allow camera access. The policy is locked while the camera/session is active. Loading errors identify the library, runtime, model, or worker stage and offer a retry.
 2. **Calibration:** click Start calibration and follow screen (5s), notes (5s), and side-glance (3s) prompts. Each step needs at least 90% valid face/pose readings. Only valid frames enter the pose average. The side-glance center must fall outside both rectangular study zones. A tracking interruption fails calibration and offers retry.
 3. **Setup:** choose 15, 25 (default), 45, or custom whole minutes (minimum 1), and an engagement goal from 0–100% (default 80%). Start Session unlocks synthesized audio through that user gesture. If sound is unavailable, visual reminders still work and Enable sound offers another attempt.

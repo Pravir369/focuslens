@@ -18,6 +18,7 @@ import { PacingStore } from "./pacing.js";
 import { ReportController } from "./reports.js";
 import { WindowSignal } from "./window-signal.js";
 import { classifyWithWindow } from "./window-fusion.js";
+import { personEvidence } from './presence.js';
 
 // Optional dependencies let the browser integration fixture exercise this exact
 // interface with a controlled clock and detector, without camera permissions.
@@ -258,6 +259,11 @@ export function boot(loadVision, overrides = {}) {
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
     const context = canvas.getContext("2d");
     context.clearRect(0, 0, width, height);
+    const person = personEvidence(phoneTracker?.latest, now);
+    set('person-status', activePhonePolicy === 'phone-allowed' ? 'Off · face-only mode' : person.status === 'present' ? 'Person detected · Camera A'
+      : person.status === 'absent' ? 'No person detected · Camera A' : 'Unknown · waiting for fresh result');
+    set('person-confidence', score(person.confidence));
+    set('person-age', person.ageMs === null ? 'No result yet' : `${Math.max(0, person.ageMs).toFixed(0)}ms · ${person.status === 'unknown' ? 'stale' : 'fresh'}`);
     if (activePhonePolicy === "phone-allowed") {
       set("phone-status", "Off · studying with phone"); set("phone-confidence", "—"); set("phone-age", "Not required");
       return;
@@ -410,7 +416,8 @@ export function boot(loadVision, overrides = {}) {
       }
     }
     const observation = classifyWithWindow(frame, calibration.result, {
-      phonePolicy: activePhonePolicy, phoneSample: phoneTracker?.latest, deskPhoneSample: deskUsable ? phoneTracker?.deskLatest : null, now,
+      phonePolicy: activePhonePolicy, phoneSample: phoneTracker?.latest, deskPhoneSample: deskUsable ? phoneTracker?.deskLatest : null,
+      presenceEnabled: activePhonePolicy === 'phone-free', now,
     }, windows.offTask());
     latestRaw = observation.state;
     set("raw", latestRaw ?? "Unclassified"); set("reason", observation.reason);
@@ -491,13 +498,13 @@ export function boot(loadVision, overrides = {}) {
         onError(error) { if (token === operation) pipelineFault("Face tracking stopped. Retry tracking, then resume.", error); },
       });
       if (activePhonePolicy === "phone-free") {
-        phoneLoadingStage = "Loading phone detector…";
-        set("status", "Face tracking ready. Loading phone detection…");
+        phoneLoadingStage = "Loading person and phone detector…";
+        set("status", "Face tracking ready. Loading person and phone detection…");
         phoneTracker = deps.createPhoneTracker({
           onStage(stage) {
             if (token !== operation) return;
-            phoneLoadingStage = stage === "library" ? "Loading phone tracking library…"
-              : stage === "phone-model" ? "Downloading phone model…" : "Initializing phone runtime / WASM…";
+            phoneLoadingStage = stage === "library" ? "Loading object tracking library…"
+              : stage === "phone-model" ? "Downloading person / phone model…" : "Initializing object runtime / WASM…";
             set("status", `Face tracking ready. ${phoneLoadingStage}`);
           },
           onError(error) { if (token === operation) pipelineFault("Phone detection stopped. Retry tracking, then resume.", error); },
