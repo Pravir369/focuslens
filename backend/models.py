@@ -128,3 +128,14 @@ class Event(db.Model):
         CheckConstraint("trigger_source IS NULL OR (type = 'distracted' AND trigger_source IN ('cameraA', 'cameraB', 'window'))", name="valid_source"),
         CheckConstraint("end_time >= start_time AND duration_ms = end_time - start_time", name="duration_matches"),
     )
+
+
+class WebPushSubscription(db.Model):
+    __tablename__ = 'web_push_subscriptions'
+    id = db.Column(db.String(36), primary_key=True, default=identifier)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    endpoint_hash = db.Column(db.String(64), nullable=False, unique=True)
+    endpoint = db.Column(db.String(4096), nullable=False)
+    p256dh = db.Column(db.String(128), nullable=False)
+    auth = db.Column(db.String(32), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)

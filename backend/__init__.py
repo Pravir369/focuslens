@@ -61,6 +61,10 @@ def create_app(test_config=None):
     app.register_blueprint(api)
     from .preferences import preferences
     app.register_blueprint(preferences)
+    from .web_push import PushService, api as web_push_api
+    app.extensions['web_push'] = PushService(app, app.config.get('WEB_PUSH_PRIVATE_KEY', env.get('WEB_PUSH_PRIVATE_KEY', '')),
+        app.config.get('WEB_PUSH_SUBJECT', env.get('WEB_PUSH_SUBJECT', '')), app.config.get('WEB_PUSH_SENDER'))
+    app.register_blueprint(web_push_api)
 
     @app.before_request
     def transport_and_origin():
@@ -86,6 +90,9 @@ def create_app(test_config=None):
         if request.path=="/study" or request.path.startswith("/js/") or request.path=="/tests/account-study-browser.html":
             response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/; style-src 'self'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/ https://storage.googleapis.com/mediapipe-models/; worker-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; manifest-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+        if request.path.startswith('/companion'):
+            response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+            response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         if app.config["PRODUCTION"]: response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
 
@@ -118,6 +125,20 @@ def create_app(test_config=None):
 
     @app.get("/study")
     def study_page(): return send_from_directory(ROOT,"index.html")
+
+    @app.get('/companion')
+    @app.get('/companion/')
+    def companion_page(): return send_from_directory(ROOT/'companion', 'index.html')
+
+    @app.get('/companion/<name>')
+    def companion_asset(name):
+        if name not in {'app.js', 'styles.css', 'manifest.webmanifest', 'push.js', 'sw.js'}: return jsonify(error='Not found.'),404
+        return send_from_directory(ROOT/'companion', name)
+
+    @app.get('/companion/shared/<name>')
+    def companion_shared_asset(name):
+        if name not in {'api.js', 'config.js', 'session.js', 'progress.js'}: return jsonify(error='Not found.'),404
+        return send_from_directory(ROOT/'mobile'/'src',name)
 
     @app.get("/js/<name>")
     def study_asset(name):

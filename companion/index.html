@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#28664e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="FocusLens">
+  <title>FocusLens · Companion</title>
+  <link rel="manifest" href="/companion/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/companion/styles.css">
+  <script type="module" src="/companion/app.js"></script>
+</head>
+<body>
+  <main>
+    <header><p class="eyebrow">FOCUSLENS · COMPANION</p><h1>A place for your progress.</h1><p class="intro">Study on your laptop. See your progress wherever you are.</p></header>
+    <p id="app-status" class="status" role="status" aria-live="polite"></p>
+    <section id="auth" class="card" aria-labelledby="auth-title">
+      <h2 id="auth-title">Welcome back.</h2>
+      <div class="tabs"><button id="choose-login" aria-pressed="true" type="button">Sign in</button><button id="choose-signup" aria-pressed="false" type="button">Create account</button></div>
+      <form id="auth-form">
+        <div id="signup-name-group" hidden><label for="auth-name">Your name</label><input id="auth-name" autocomplete="name" maxlength="100"></div>
+        <label for="auth-email">Email</label><input id="auth-email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" required>
+        <label for="auth-password">Password</label><input id="auth-password" type="password" autocomplete="current-password" required>
+        <div id="signup-role-group" hidden><p class="muted">At least 8 characters; maximum 72 UTF-8 bytes.</p><label for="auth-role">I’m a</label><select id="auth-role"><option value="student">Student</option><option value="parent">Parent</option></select></div>
+        <p id="auth-error" role="alert" class="error" hidden></p>
+        <button id="auth-submit" type="submit">Sign in to FocusLens</button>
+      </form>
+      <p class="muted">Use your laptop’s FocusLens email and password. Access stays in this open app only; you may need to sign in again after closing it. No password or token is saved in browser storage.</p>
+    </section>
+    <section id="signed-in" hidden>
+      <nav id="student-nav" class="tabs" aria-label="Companion pages"><button type="button" data-page="dashboard" aria-pressed="true">Dashboard</button><button type="button" data-page="history" aria-pressed="false">History</button><button type="button" data-page="profile" aria-pressed="false">Profile</button></nav>
+      <div id="content" tabindex="-1" aria-live="polite"></div>
+      <button type="button" id="sign-out" class="secondary full-width">Sign out on this device</button>
+    </section>
+    <aside class="install card"><h2>Keep FocusLens close.</h2><p>On iPhone, open this page in Safari, tap Share, then <strong>Add to Home Screen</strong>. Open the new icon to use the companion like an app.</p><p class="muted">This companion never accesses your camera or microphone. Camera images stay on your laptop.</p></aside>
+    <footer>FocusLens · Your progress, in your hands.</footer>
+  </main>
+</body>
+</html>
