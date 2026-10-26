@@ -36,6 +36,14 @@ export class AuthSession {
     let result;
     try { result = await this.api.request(`/auth/${kind}`, { method: 'POST', body: fields }); }
     catch (error) { if (error.status === 401) throw new Error('Invalid email or password.'); throw error; }
+    return this.completeAuthentication(result, generation);
+  }
+  async authenticateExternal(exchange) {
+    const generation = ++this.generation;
+    const result = await exchange();
+    return this.completeAuthentication(result, generation);
+  }
+  async completeAuthentication(result, generation) {
     if (generation !== this.generation) return;
     if (typeof result.token !== 'string' || !publicUser(result.user)) throw new Error('Your sign-in response could not be verified.');
     const user = await this.api.request('/auth/me', { token: result.token });

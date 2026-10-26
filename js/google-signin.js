@@ -36,7 +36,8 @@ export async function googleConfig(fetcher = (...args) => fetch(...args)) {
 }
 
 export function bootGoogleSignIn(doc, client, { onUser, setBusy, isBusy, onError, onStatus,
-  loadIdentity = () => loadGoogleIdentity(doc), getConfig = () => googleConfig(client.fetcher) }) {
+  loadIdentity = () => loadGoogleIdentity(doc), getConfig = () => googleConfig(client.fetcher),
+  readyMessage = "Use your Google account, or sign in with email below. New accounts use the role selected above." }) {
   const get = id => doc.getElementById(id);
   let generation = 0, credential = null, identity;
   const googleStatus = message => { get("google-status").textContent = message; };
@@ -87,7 +88,7 @@ export function bootGoogleSignIn(doc, client, { onUser, setBusy, isBusy, onError
           credential = response.credential; void submit();
         } });
       identity.renderButton(get("google-button"), { type: "standard", theme: "outline", size: "large", text: "signin_with", shape: "rectangular", width: 300 });
-      googleStatus("Use your Google account, or sign in with email below. New accounts use the role selected above.");
+      googleStatus(readyMessage);
     } catch (failure) {
       if (current !== generation) return;
       googleStatus(failure.name === "AbortError" ? "Google sign-in timed out. Please retry." : failure.message);

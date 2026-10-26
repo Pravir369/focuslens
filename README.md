@@ -60,7 +60,9 @@ node --test tests/*.test.mjs
 
 The native Expo app in [`mobile/`](mobile/README.md) is active again (SDK 58): secure email/password signup/login, read-only student progress/history, and opt-in remote-notification registration with a manual test. Native endpoints require the same account JWT and never trust a client-submitted user ID. Notification tickets and provider receipts are reported separately from actual phone delivery. The existing [`companion/`](companion/README.md) Home Screen Web Push app remains usable. Neither companion accesses a camera or microphone.
 
-Before building real distraction alerts or the parent dashboard, verify native login/restoration and notification arrival on the actual iPhone, both foreground and background. Mobile Google remains later in the ordered specification and needs a development build/native OAuth setup; the existing web Google flow is unchanged. See the native README for the exact steps and current limitations.
+The user prioritized Google and approved a secure browser flow for Expo Go. The app's **Continue with Google** button opens a separate hosted sign-in page, then shows the verified account for confirmation before a one-use S256-proof exchange issues access. No login token, password or private verifier is put in a URL. The existing web cookie flow remains separate; shared signature/identity/linking checks have regression coverage for both paths. Real Google sign-in and browser return on the iPhone still need manual verification, as does the original web Google login.
+
+Before building real distraction alerts or the parent dashboard, verify native login/restoration and notification arrival on the actual iPhone, both foreground and background. See the native README for exact steps and current limitations.
 
 ## Phase 1 study app
 

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FocusLens · Google sign-in for your phone</title><link rel="icon" href="/assets/icon-192.png">
+<link rel="stylesheet" href="/assets/account.css"><script type="module" src="/assets/google-companion.js"></script></head>
+<body><main><p class="eyebrow">FocusLens · Phone sign-in</p><h1>Continue with Google.</h1>
+<p>Only continue if you just started Google sign-in in your FocusLens app.</p>
+<section class="card"><p>Check that this code matches the code in your app:</p><strong id="verification-code">Loading…</strong>
+<p id="bridge-status" role="status" aria-live="polite">Preparing your secure sign-in…</p><p id="bridge-error" role="alert" hidden></p>
+<section id="auth-forms"><div id="google-option"><label for="google-role">New account type</label><select id="google-role" disabled><option value="student">Student</option><option value="parent">Parent</option></select>
+<div id="google-button" aria-label="Google sign-in"></div><p id="google-status" class="muted" role="status"></p><button id="google-retry" type="button" hidden>Retry Google sign-in</button>
+<form id="google-link-form" hidden><p>This email already has a FocusLens account. Enter its FocusLens password to link Google. Never enter your Google password here.</p>
+<label for="google-link-password">Existing FocusLens password</label><input id="google-link-password" type="password" autocomplete="current-password" required>
+<button type="submit">Link account</button><button id="google-link-cancel" type="button">Cancel linking</button></form></div></section>
+<p id="bridge-complete" hidden>Google verified your account. Tap Done to close this browser, or return to Expo Go. Check the account shown there and tap Continue to finish signing in.</p>
+</section><p class="muted">Your login is confirmed in the app. This page does not save your FocusLens login token, password or study data.</p></main></body></html>

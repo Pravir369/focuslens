@@ -55,6 +55,9 @@ def create_app(test_config=None):
     register_auth(app)
     from .google_auth import google_auth
     app.register_blueprint(google_auth)
+    from .google_companion import BrowserFlows, api as google_companion_api
+    app.extensions['google_companion_flows'] = BrowserFlows()
+    app.register_blueprint(google_companion_api)
     from .services import Services
     from .data import api
     app.extensions["account_services"] = Services(env,app.config.get("REPORT_SENDER"))
@@ -93,6 +96,9 @@ def create_app(test_config=None):
         if request.path=="/study" or request.path.startswith("/js/") or request.path=="/tests/account-study-browser.html":
             response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/; style-src 'self'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/ https://storage.googleapis.com/mediapipe-models/; worker-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; manifest-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+        if request.path.startswith('/auth/google/companion'):
+            response.headers['Referrer-Policy'] = 'no-referrer'
+            response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         if request.path.startswith('/companion'):
             response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
             response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'

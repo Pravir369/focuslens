@@ -30,6 +30,55 @@ class BoundedGoogleRequest(Request):
         return super().__call__(*args, **kwargs)
 
 
+def verified_google_claims(token, nonce):
+    # Shared by the original web flow and the separate Expo Go browser flow.
+    # A nonce is checked only after Google's signature/audience/time verifier.
+    with requests.Session() as session:
+        claims = id_token.verify_oauth2_token(token, BoundedGoogleRequest(session=session), current_app.config["GOOGLE_CLIENT_ID"])
+    if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com") or claims.get("aud") != current_app.config["GOOGLE_CLIENT_ID"]:
+        raise ValueError("Invalid issuer or audience")
+    if not isinstance(claims.get("nonce"), str) or not secrets.compare_digest(claims["nonce"].encode(), nonce.encode()):
+        raise ValueError("Wrong browser challenge")
+    subject = claims.get("sub")
+    if not isinstance(subject, str) or not 1 <= len(subject) <= 255 or claims.get("email_verified") is not True:
+        raise ValueError("Unverified Google identity")
+    normalized_email(claims.get("email"))
+    return claims
+
+
+class GoogleAccountError(Exception):
+    def __init__(self, message, status=409, code=None):
+        self.message = message; self.status = status; self.code = code
+
+
+def google_account(claims, role, data):
+    """Resolve only a verified Google subject; never blindly link by email."""
+    subject = claims['sub']; email = normalized_email(claims['email'])
+    user = db.session.execute(db.select(User).where(User.google_id == subject)).scalar_one_or_none()
+    created = False
+    if user is None:
+        user = db.session.execute(db.select(User).where(User.email == email)).scalar_one_or_none()
+        if user is not None:
+            if user.google_id is not None or user.password_hash is None:
+                raise GoogleAccountError("This account cannot be linked to that Google identity.")
+            if "password" not in data:
+                raise GoogleAccountError("Enter your existing FocusLens password to link this account.", code="password_required")
+            try: valid = bcrypt.checkpw(password_bytes(data["password"]), user.password_hash)
+            except ValueError: valid = False
+            if not valid: raise GoogleAccountError("Invalid credentials.", 401)
+            user.google_id = subject
+        else:
+            name = claims.get("name")
+            if not isinstance(name, str) or not name.strip(): name = "FocusLens user"
+            name = "".join(c for c in name if ord(c) >= 32 and ord(c) != 127).strip()[:100] or "FocusLens user"
+            user = User(email=email, google_id=subject, display_name=name, role=role)
+            db.session.add(user); created = True
+    try: db.session.commit()
+    except IntegrityError:
+        db.session.rollback(); raise GoogleAccountError("Account access changed. Please sign in again.") from None
+    return user, created
+
+
 @google_auth.before_request
 def limit_google_attempts():
     if not current_app.extensions["auth_limiter"].allowed(request.remote_addr):
@@ -68,55 +117,16 @@ def authenticate_google():
     except BadSignature:
         return jsonify(error="Google sign-in expired. Retry Google sign-in.", code="google_restart"), 401
     try:
-        # The library verifies Google's signature, issuer, audience and expiry.
-        # Never decode without verification or accept client-submitted user info.
-        with requests.Session() as session:
-            claims = id_token.verify_oauth2_token(token, BoundedGoogleRequest(session=session), current_app.config["GOOGLE_CLIENT_ID"])
-        if claims.get("iss") not in ("accounts.google.com", "https://accounts.google.com") or claims.get("aud") != current_app.config["GOOGLE_CLIENT_ID"]:
-            raise ValueError("Invalid issuer or audience")
-        if not isinstance(claims.get("nonce"), str) or not secrets.compare_digest(claims["nonce"].encode(), nonce.encode()):
-            raise ValueError("Wrong browser challenge")
-        subject = claims.get("sub")
-        if not isinstance(subject, str) or not 1 <= len(subject) <= 255 or claims.get("email_verified") is not True:
-            raise ValueError("Unverified Google identity")
-        email = normalized_email(claims.get("email"))
+        claims = verified_google_claims(token, nonce)
     except TransportError:
         return jsonify(error="Google could not be reached. Please try again."), 503
     except (ValueError, GoogleAuthError):
         return jsonify(error="Google sign-in could not be verified. Retry Google sign-in.", code="google_restart"), 401
 
-    user = db.session.execute(db.select(User).where(User.google_id == subject)).scalar_one_or_none()
-    created = False
-    if user is None:
-        user = db.session.execute(db.select(User).where(User.email == email)).scalar_one_or_none()
-        if user is not None:
-            # Password signup has not verified email ownership. Blind email
-            # linking could preserve an attacker's password on a victim account.
-            # Require both the verified Google identity and the existing password.
-            if user.google_id is not None or user.password_hash is None:
-                return jsonify(error="This account cannot be linked to that Google identity."), 409
-            if "password" not in data:
-                return jsonify(error="Enter your existing FocusLens password to link this account.", code="password_required"), 409
-            try:
-                valid = bcrypt.checkpw(password_bytes(data["password"]), user.password_hash)
-            except ValueError:
-                valid = False
-            if not valid:
-                return jsonify(error="Invalid credentials."), 401
-            user.google_id = subject
-        else:
-            name = claims.get("name")
-            if not isinstance(name, str) or not name.strip(): name = "FocusLens user"
-            name = "".join(c for c in name if ord(c) >= 32 and ord(c) != 127).strip()[:100] or "FocusLens user"
-            user = User(email=email, google_id=subject, display_name=name, role=data.get("role", "student"))
-            db.session.add(user)
-            created = True
-    # Existing users retain their stored name/email/role; sub is the identity.
     try:
-        db.session.commit()
-    except IntegrityError:
-        db.session.rollback()
-        return jsonify(error="Account access changed. Please sign in again."), 409
+        user, created = google_account(claims, data.get("role", "student"), data)
+    except GoogleAccountError as error:
+        return jsonify(error=error.message, **({'code':error.code} if error.code else {})), error.status
     response = jsonify(authentication_result(user,data))
     response.status_code = 201 if created else 200
     response.delete_cookie(COOKIE, path="/auth/google", secure=current_app.config["PRODUCTION"], httponly=True, samesite="Strict")
