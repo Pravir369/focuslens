@@ -3,11 +3,13 @@ import { bootGoogleSignIn } from "./google-signin.js";
 import { legacySnapshot, acknowledgeLegacy } from "./legacy-import.js";
 import { bootAccountDashboard } from "./account-dashboard.js";
 import { bootAccountSettings } from "./account-settings.js";
+import { ACCOUNT_REQUEST_TIMEOUT_MS, ACCOUNT_SLOW_NOTICE_MS, ACCOUNT_SLOW_NOTICE, readAccountJson, authFailureMessage } from './account-network.js';
 const TOKEN_KEY = "focuslens.auth.token.v1";
 
 export class AccountClient {
-  constructor({ fetcher = (...args) => fetch(...args), storage = () => sessionStorage } = {}) {
-    Object.assign(this, { fetcher, storage });
+  constructor({ fetcher = (...args) => fetch(...args), storage = () => sessionStorage,
+    timeoutMs = ACCOUNT_REQUEST_TIMEOUT_MS, setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = id => clearTimeout(id) } = {}) {
+    Object.assign(this, { fetcher, storage, timeoutMs, setTimer, clearTimer });
     this.generation = 0; this.token = null; this.storageAvailable = true;
     try { this.token = this.storage().getItem(TOKEN_KEY); } catch { this.storageAvailable = false; }
   }
@@ -21,27 +23,29 @@ export class AccountClient {
     if (!this.token) return null;
     const generation = ++this.generation;
     const abort = new AbortController(); this.abort = abort;
-    const timeout = setTimeout(() => abort.abort(), 20000);
+    const timeout = this.setTimer(() => abort.abort(), this.timeoutMs);
     try {
       const response = await this.fetcher("/auth/me", { headers: { Authorization: `Bearer ${this.token}` }, signal: abort.signal, credentials: "omit" });
-      const data = await response.json();
+      const data = await readAccountJson(response);
       if (generation !== this.generation) return null;
+      if (abort.signal.aborted) throw new DOMException('Request aborted', 'AbortError');
       if (response.status === 401) { this.logout(); throw new Error("Your session expired. Please sign in again."); }
       if (!response.ok || typeof data.id !== "string" || typeof data.email !== "string") throw new Error("Account access could not be verified. Please try again.");
       return data;
-    } finally { clearTimeout(timeout); }
+    } finally { this.clearTimer(timeout); }
   }
   async authenticate(kind, fields) {
     this.abort?.abort();
     const generation = ++this.generation;
     const abort = new AbortController(); this.abort = abort;
-    const timeout = setTimeout(() => abort.abort(), 20000);
+    const timeout = this.setTimer(() => abort.abort(), this.timeoutMs);
     let legacy;
     try { legacy=legacySnapshot(); } catch { this.migrationMessage="Old history could not be read. Your original browser data was kept."; }
     try {
       const response = await this.fetcher(`/auth/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...fields, ...legacy?.payload }), signal: abort.signal, credentials: kind === "google" ? "same-origin" : "omit" });
-      const data = await response.json();
+      const data = await readAccountJson(response);
       if (generation !== this.generation) return null;
+      if (abort.signal.aborted) throw new DOMException('Request aborted', 'AbortError');
       if (!response.ok) {
         const failure = new Error(data.error || "Account access could not be completed.");
         failure.code = data.code;
@@ -54,13 +58,14 @@ export class AccountClient {
         catch { this.migrationMessage="Your old history was imported, but originals could not be cleared. Retrying is safe."; }
       } else if (data.migration) this.migrationMessage=data.migration.error;
       return data.user;
-    } finally { clearTimeout(timeout); }
+    } finally { this.clearTimer(timeout); }
   }
 }
 
 export function bootAccount(doc = document, client = new AccountClient()) {
   const get = (id) => doc.getElementById(id);
   let busy = false;
+  let slowNotice;
   let googleSignIn;
   const dashboard = bootAccountDashboard(doc,client);
   let currentUser=null,viewGeneration=0;
@@ -78,6 +83,8 @@ export function bootAccount(doc = document, client = new AccountClient()) {
   }
   function setBusy(value) {
     busy = value;
+    clearTimeout(slowNotice);
+    if (value) slowNotice = setTimeout(() => { if (busy) status(ACCOUNT_SLOW_NOTICE); }, ACCOUNT_SLOW_NOTICE_MS);
     get("auth-forms").querySelectorAll("input,select,button").forEach((input) => { input.disabled = value; });
     get("google-option").setAttribute("aria-busy", String(value));
   }
@@ -103,7 +110,7 @@ export function bootAccount(doc = document, client = new AccountClient()) {
         const user = await client.authenticate(kind, fields);
         if (user) { get("login-form").reset(); get("signup-form").reset(); signedIn(user); }
       } catch (failure) {
-        error(failure.name === "AbortError" ? "The request timed out. Please try again." : failure.message); status("Your study data has not been changed.");
+        error(authFailureMessage(failure, kind)); status(kind === 'signup' ? 'Account creation has not been confirmed.' : 'Sign-in has not completed.');
       } finally {
         get(`${kind}-password`).value = "";
         setBusy(false);

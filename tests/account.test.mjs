@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { AccountClient } from "../js/account.js";
 import { bootGoogleSignIn, googleConfig, loadGoogleIdentity } from "../js/google-signin.js";
+import { ACCOUNT_REQUEST_TIMEOUT_MS, authFailureMessage, readAccountJson } from '../js/account-network.js';
 
 const memory = () => {
   const map = new Map();
@@ -36,6 +37,52 @@ test("blocked browser storage allows in-memory sign-in; late responses cannot si
   client.fetcher=()=>new Promise(done=>{resolve=done;});
   const pending=client.authenticate("login",{}); client.logout(); resolve(response({token:"late-token",user}));
   assert.equal(await pending,null); assert.equal(client.token,null);
+});
+
+function clock() {
+  let now = 0, serial = 0; const timers = new Map();
+  return { setTimer(fn, delay) { const id = ++serial; timers.set(id, { fn, at: now + delay }); return id; },
+    clearTimer(id) { timers.delete(id); }, get pending() { return timers.size; },
+    advance(ms) { now += ms; for (const [id, timer] of timers) if (timer.at <= now) { timers.delete(id); timer.fn(); } } };
+}
+
+test('a cold-start auth response past the former 20-second limit completes once without retries', async () => {
+  const time = clock(); let complete, signal, calls = 0;
+  const client = new AccountClient({ storage: memory, ...time, fetcher: (path, options) => {
+    calls++; signal = options.signal; return new Promise(resolve => { complete = resolve; });
+  } });
+  const pending = client.authenticate('signup', { email: user.email, password: 'test password', role: 'student' });
+  time.advance(45000); assert.equal(signal.aborted, false); assert.equal(client.token, null);
+  complete(response({ token: 'test-token', user })); assert.deepEqual(await pending, user);
+  assert.equal(calls, 1); assert.equal(time.pending, 0);
+  const restoring = client.restore(); time.advance(45000); assert.equal(signal.aborted, false);
+  complete(response(user)); assert.deepEqual(await restoring, user); assert.equal(time.pending, 0);
+});
+
+test('the bounded cold-start wait rejects late access and never automatically resends signup', async () => {
+  const time = clock(); let complete, signal, calls = 0;
+  const client = new AccountClient({ storage: memory, ...time, fetcher: (path, options) => {
+    calls++; signal = options.signal; return new Promise(resolve => { complete = resolve; });
+  } });
+  const pending = client.authenticate('signup', {});
+  time.advance(ACCOUNT_REQUEST_TIMEOUT_MS); assert.equal(signal.aborted, true);
+  // Even a transport that returns after cancellation must not adopt its token.
+  complete(response({ token: 'too-late-test-token', user }));
+  await assert.rejects(pending, error => error.name === 'AbortError');
+  assert.equal(client.token, null); assert.equal(calls, 1); assert.equal(time.pending, 0);
+  assert.match(authFailureMessage(new DOMException('aborted', 'AbortError'), 'signup'), /account may already exist/);
+  assert.match(authFailureMessage(new DOMException('aborted', 'AbortError'), 'signup'), /try Sign in/);
+});
+
+test('hosting HTML errors are explained without exposing raw server responses or replaying writes', async () => {
+  let calls = 0;
+  const client = new AccountClient({ storage: memory, fetcher: async () => {
+    calls++; return { json: async () => { throw new SyntaxError('private HTML response'); } };
+  } });
+  await assert.rejects(client.authenticate('signup', {}), /try signing in first/);
+  assert.equal(calls, 1); assert.equal(client.token, null);
+  await assert.rejects(readAccountJson({ json: async () => { throw new DOMException('aborted', 'AbortError'); } }), error => error.name === 'AbortError');
+  assert.equal(authFailureMessage(new Error('Invalid credentials.'), 'login'), 'Invalid credentials.');
 });
 
 test("Google config uses same-origin cookies and rejects missing configuration", async () => {

@@ -1,5 +1,6 @@
 // Google's ID token stays in memory and is sent only in a JSON POST to our API.
 // Only our server-issued bearer token is saved by AccountClient.
+import { ACCOUNT_REQUEST_TIMEOUT_MS, readAccountJson } from './account-network.js';
 let identityLoading;
 export function loadGoogleIdentity(doc = document, win = window) {
   if (win.google?.accounts?.id) return Promise.resolve(win.google.accounts.id);
@@ -27,10 +28,10 @@ export function loadGoogleIdentity(doc = document, win = window) {
 }
 
 export async function googleConfig(fetcher = (...args) => fetch(...args)) {
-  const abort = new AbortController(); const timeout = setTimeout(() => abort.abort(), 20000);
+  const abort = new AbortController(); const timeout = setTimeout(() => abort.abort(), ACCOUNT_REQUEST_TIMEOUT_MS);
   try {
     const response = await fetcher("/auth/google/config", { credentials: "same-origin", signal: abort.signal });
-    const config = await response.json();
+    const config = await readAccountJson(response);
     if (!response.ok) throw new Error(config.error || "Google sign-in is unavailable. Please retry.");
     if (typeof config.clientId !== "string" || !config.clientId.endsWith(".apps.googleusercontent.com") || typeof config.nonce !== "string" || !config.nonce) {
       throw new Error("Google sign-in configuration could not be verified.");
