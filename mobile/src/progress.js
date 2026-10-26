@@ -1,4 +1,6 @@
-export const STATE_COLORS = { engaged: '#32775a', distracted: '#b4771d', drowsy: '#80639d', away: '#79838c', paused: '#d6dce0', unclassified: '#eee7d9' };
+// Classifier status colours, kept identical to the [data-state] rules in
+// ../../styles.css so the web and mobile timelines agree on every meaning.
+export const STATE_COLORS = { engaged: '#28D17C', distracted: '#FFB020', drowsy: '#B18CFF', away: '#A0A8BC', paused: '#6B6E8F', unclassified: '#4A4D6B' };
 export const STATE_LABELS = { engaged: 'Engaged', distracted: 'Distracted', drowsy: 'Drowsy', away: 'Away', paused: 'Paused', unclassified: 'Unclassified' };
 export const measured = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 export const percentage = value => measured(value) ? `${Math.round(value)}%` : 'Not measured';

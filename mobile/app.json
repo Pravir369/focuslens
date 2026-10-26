@@ -5,14 +5,14 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pravir369.focuslens.companion"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#242B40",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -34,6 +34,7 @@
         "projectId": "063625c9-aaee-4922-b8f9-88a895eab76c"
       }
     },
-    "owner": "pbrahmbhatt6"
+    "owner": "pbrahmbhatt6",
+    "backgroundColor": "#242B40"
   }
 }

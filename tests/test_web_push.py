@@ -87,7 +87,7 @@ class WebPushTests(unittest.TestCase):
         self.assertEqual(self.call('GET','/web-push/jobs/'+job_id,user=None).status_code,401)
         self.assertEqual(self.call('POST','/web-push/test',{'subscriptionId':sid}).status_code,400)
         self.assertEqual(len(self.sent),1)
-        self.assertIn(self.client.post('/notify-parent').status_code,(404,405))
+        self.assertEqual(self.client.post('/notify-parent').status_code,401)
 
     def test_expired_subscription_cleanup_and_error_messages_do_not_leak_provider_secrets(self):
         sid=self.register().get_json()['subscriptionId']

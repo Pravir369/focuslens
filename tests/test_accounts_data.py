@@ -107,6 +107,26 @@ class DataTests(unittest.TestCase):
         self.assertEqual(self.call('GET','/reports/'+report_id,user='other').status_code,404)
         self.assertEqual(self.call('POST','/send-report',{'sessionId':self.sid,'sessionSummary':{}}).status_code,400)
 
+    def test_family_summary_requires_link_and_aggregates_recent_weeks_only(self):
+        self.call('POST','/family-link',{'studentEmail':'student@example.test'},user='parent')
+        student_id=self.call('GET','/auth/me',user='student').get_json()['id']
+        self.assertEqual(self.call('GET','/family/'+student_id+'/summary',user='other').status_code,403)
+        self.assertEqual(self.call('GET','/family/'+student_id+'/summary',user='student').status_code,403)
+        self.assertEqual(self.call('GET','/family/not-a-uuid/summary',user='parent').status_code,400)
+        empty=self.call('GET','/family/'+student_id+'/summary',user='parent').get_json()
+        self.assertEqual(empty,dict(sessionsThisWeek=0,avgEngagementPct=None,avgRecoverySpeedMs=None,trendVsPriorWeek=None))
+        now=int(time.time()*1000); week=7*24*60*60*1000
+        def seeded(end_time,engagement,recovery):
+            db.session.add(StudySession(id=str(uuid.uuid4()),user_id=student_id,start_time=end_time-6000,end_time=end_time,
+                goal_minutes=1,goal_engagement_pct=80,phone_policy='phone-free',engagement_pct=engagement,avg_recovery_speed_ms=recovery,
+                distraction_count=1,recovery_count=1,longest_distraction_ms=3000,active_ms=6000,first_distraction_ms=0,
+                import_source='live',end_reason='ended-early'))
+        seeded(now-1000,60,4000); seeded(now-week-1000,40,2000); seeded(now-3*week,10,1000); db.session.commit()
+        result=self.call('GET','/family/'+student_id+'/summary',user='parent').get_json()
+        self.assertEqual(result,dict(sessionsThisWeek=1,avgEngagementPct=60,avgRecoverySpeedMs=4000,trendVsPriorWeek=20))
+        # A family link never exposes the event log or per-session detail, only this aggregate.
+        self.assertNotIn('sessions',result); self.assertNotIn('events',result)
+
     def test_paired_monitor_is_scoped_revocable_and_cannot_replay_old_segment(self):
         self.create(); state=self.app.extensions['account_services']
         pair=self.call('POST','/monitor/pair',{}).get_json()['pairCode']

@@ -4,17 +4,41 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FocusLens · Study session</title>
-  <meta name="theme-color" content="#28664e">
+  <meta name="theme-color" content="#242B40">
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" type="image/png" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./styles.css?v=7.4">
+  <link rel="stylesheet" href="./styles.css?v=8.0">
 </head>
 <body>
-  <main>
+  <svg class="icon-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24"><path d="M10 2h4"/><path d="M12 14v-4"/><circle cx="12" cy="14" r="8"/></symbol>
+  </svg>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <main id="main" tabindex="-1">
     <header>
-      <p class="eyebrow">FocusLens</p>
+      <p class="brand">
+        <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+          <defs><linearGradient id="fl-mark" gradientUnits="userSpaceOnUse" x1="4" y1="4" x2="44" y2="44">
+            <stop offset="0" stop-color="#3D7BFF"/><stop offset=".52" stop-color="#8D7CFF"/><stop offset="1" stop-color="#FF6B6B"/>
+          </linearGradient></defs>
+          <g fill="none" stroke="url(#fl-mark)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 15V10A6 6 0 0 1 10 4H15"/><path d="M33 4H38A6 6 0 0 1 44 10V15"/>
+            <path d="M44 33V38A6 6 0 0 1 38 44H33"/><path d="M15 44H10A6 6 0 0 1 4 38V33"/>
+            <circle cx="24" cy="24" r="9.25"/>
+          </g>
+        </svg>
+        <span class="brand-word">Focus<b>Lens</b></span>
+      </p>
       <h1>A little support for your next study session.</h1>
+      <ol class="flow-rail" aria-hidden="true">
+        <li data-short="Start">Start</li>
+        <li data-short="Cal.">Calibrate</li>
+        <li data-short="Setup">Setup</li>
+        <li data-short="Live">Live</li>
+        <li data-short="Recap">Summary</li>
+      </ol>
     </header>
     <p id="error" class="error" role="alert" hidden></p>
     <p id="status" class="muted" role="status">Ready when you are.</p>
@@ -23,10 +47,13 @@
         <section class="card" data-view="start" aria-labelledby="start-title">
           <h2 id="start-title" tabindex="-1">Make room to focus.</h2>
           <p>Calibrate your study positions, choose a session, and receive gentle reminders when a distraction lasts.</p>
-          <p><strong>Your camera footage and images never leave this device. Nothing from your camera is uploaded.</strong></p>
-          <p class="muted">The tracking library and models download over the network. All camera processing happens in your browser. Camera images are never saved. Optional history keeps summary statistics in this browser on this device.</p>
-          <p class="muted">A random local profile ID groups your data; it is not a login. First-distraction timing is saved locally for pacing suggestions, separately from optional summary history.</p>
-          <p class="muted">If you choose Send Report after a session, its summary and text timeline are emailed through your configured sending account. Camera footage is never included.</p>
+          <div class="privacy-note">
+            <svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg>
+            <p><strong>Your camera footage and images never leave this device. Nothing from your camera is uploaded.</strong></p>
+            <p class="muted">The tracking library and models download over the network. All camera processing happens in your browser. Camera images are never saved. Optional history keeps summary statistics in this browser on this device.</p>
+            <p class="muted">A random local profile ID groups your data; it is not a login. First-distraction timing is saved locally for pacing suggestions, separately from optional summary history.</p>
+            <p class="muted">If you choose Send Report after a session, its summary and text timeline are emailed through your configured sending account. Camera footage is never included.</p>
+          </div>
           <p id="profile-status" class="muted" role="status"></p>
           <label for="phone-policy">Phone policy</label>
           <select id="phone-policy">
@@ -138,8 +165,11 @@
         <section class="card" data-view="summary" aria-labelledby="summary-title" hidden>
           <h2 id="summary-title" tabindex="-1">Your session, at a glance.</h2>
           <p id="summary-meta" class="muted"></p>
-          <p id="summary-recovery" class="recovery-stat"></p>
-          <p id="summary-recoveries" class="muted"></p>
+          <div class="recovery-hero">
+            <p class="eyebrow">Recovery speed</p>
+            <p id="summary-recovery" class="recovery-stat"></p>
+            <p id="summary-recoveries" class="muted"></p>
+          </div>
           <p id="summary-phone-sources" class="muted"></p>
           <p id="summary-window-sources" class="muted"></p>
           <div class="summary-stats">

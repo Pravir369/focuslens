@@ -1,1 +1,249 @@
-:root{color-scheme:light;font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#20332b;background:#f1f6f2}*{box-sizing:border-box}body{margin:0}main{max-width:640px;margin:auto;padding:max(24px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) max(32px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left))}h1{font-size:clamp(2rem,7.5vw,2.8rem);line-height:1.12;letter-spacing:-.04em;max-width:13ch;margin:18px 0}h2{font-size:1.35rem;line-height:1.25;margin:0 0 14px}p{margin:10px 0}.eyebrow{color:#28664e;font-size:.72rem;letter-spacing:.15em;font-weight:800;margin-top:18px}.intro{color:#52645b;font-size:1.05rem;margin-bottom:24px}.card{background:#fff;border:1px solid #d7e2d9;border-radius:18px;padding:22px;margin:16px 0}.tabs,.row{display:flex;gap:8px;flex-wrap:wrap}.tabs{margin:12px 0 20px}.tabs button{flex:1;padding:12px 10px;background:transparent;color:#28664e;border-color:#9aae9f}.tabs button[aria-pressed=true]{background:#28664e;color:white;border-color:#28664e}button{min-height:48px;border:1px solid #28664e;border-radius:10px;background:#28664e;color:#fff;font:inherit;font-weight:600;padding:12px 17px;cursor:pointer}button:disabled{opacity:.55;cursor:wait}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid #cb8b29;outline-offset:3px}button.secondary{background:#fff;color:#28664e}.full-width{width:100%;margin-top:16px}input,select{display:block;width:100%;border:1px solid #8c9f92;border-radius:8px;background:#fff;color:#20332b;font:inherit;font-size:16px;padding:13px;min-height:48px;margin-bottom:16px}label{display:block;font-size:.95rem;font-weight:600;margin:18px 0 6px}form>button{width:100%;margin-top:8px}.muted,small{font-size:.82rem;color:#52645b;line-height:1.55}.error{color:#8a2828}.status{font-size:.9rem;color:#52645b;min-height:1.2em}.stat{font-size:3.1rem;font-weight:750;letter-spacing:-.05em;color:#28664e;margin:4px 0}.section-title{font-size:1.12rem;margin:26px 0 8px}.timeline{display:flex;height:26px;width:100%;border-radius:7px;overflow:hidden;margin:16px 0}.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.8rem}.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}.phone-catch{border-left:3px solid #b4771d;padding-left:12px;font-size:.85rem}#content:focus{outline:none}.install h2{font-size:1.05rem}.install{background:transparent;border-style:dashed;margin-top:30px}footer{text-align:center;font-size:.75rem;color:#52645b;padding:24px 0}a{color:#28664e}[hidden]{display:none!important}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+/* ==========================================================================
+   FocusLens — Electric Pop 2.0 · Home Screen companion (PWA)
+   Same token names and values as ../styles.css, ../account.css and
+   ../mobile/src/ui.js. Served from /companion/styles.css, so ../fonts/ hits
+   the /fonts/<name> allowlist in backend/__init__.py. The companion CSP is
+   default-src 'none' with style-src/font-src 'self' — nothing external here.
+   ========================================================================== */
+@font-face {
+  font-family: "Manrope";
+  src: url("../fonts/manrope-latin-var.woff2") format("woff2-variations"),
+       url("../fonts/manrope-latin-var.woff2") format("woff2");
+  font-weight: 200 800; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("../fonts/inter-latin-var.woff2") format("woff2-variations"),
+       url("../fonts/inter-latin-var.woff2") format("woff2");
+  font-weight: 100 900; font-style: normal; font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: dark;
+
+  --bg: #242B40; --surface: #373950; --raised: #444660; --inset: #2D3147;
+  --border: #555773; --border-soft: #474A64;
+
+  --text: #F5F7FF; --text-2: #C0C7DE; --text-3: #969FBC; --text-3-up: #AFB6CC;
+  --on-accent: #FFFFFF; --on-bright: #0B1020;
+
+  --cobalt: #3D7BFF; --cyan: #12CFE3; --coral: #FF6B6B; --violet: #8D7CFF; --lime: #B7F542;
+  --cobalt-text: #94B6FF; --cyan-text: #18D8ED; --coral-text: #FF9E9E;
+  --violet-text: #B9AFFF; --lime-text: #B7F542;
+  --cobalt-fill: #236AFF; --cobalt-fill-hover: #1A5BE6;
+
+  --cobalt-tint: #384570; --cobalt-edge: #395292;
+  --cyan-tint: #30546A;   --cyan-edge: #297288;
+  --coral-tint: #5B4255;  --coral-edge: #834C5A;
+  --violet-tint: #464570; --violet-edge: #585292;
+
+  --engaged: #28D17C; --distracted: #FFB020; --drowsy: #B18CFF; --away: #A0A8BC;
+  --fault: #FF4D5D; --fault-tint: #5B3D52; --fault-text: #FF9AA3;
+
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 18px;
+  --shadow-panel: 0 20px 44px -28px rgba(6, 8, 20, .95);
+  --ease: cubic-bezier(.2, .7, .3, 1); --t: .15s;
+
+  --display: "Manrope", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text-2);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(640px 420px at 100% -6%, #2F3A63 0%, transparent 64%),
+    var(--bg);
+}
+main {
+  max-width: 640px;
+  margin: auto;
+  padding:
+    max(var(--s5), env(safe-area-inset-top))
+    max(22px, env(safe-area-inset-right))
+    max(var(--s6), env(safe-area-inset-bottom))
+    max(22px, env(safe-area-inset-left));
+}
+
+/* --- Brand lockup -------------------------------------------------------- */
+.brand { display: flex; align-items: center; gap: 10px; margin: var(--s2) 0 var(--s4); }
+.brand-mark { width: 28px; height: 28px; flex: 0 0 auto; display: block; }
+.brand-word { font-family: var(--display); font-size: 1.25rem; font-weight: 800; letter-spacing: -.035em; color: var(--text); }
+.brand-word b { font-weight: 800; color: var(--violet-text); }
+
+/* --- Type ---------------------------------------------------------------- */
+h1, h2, .stat, .section-title { font-family: var(--display); color: var(--text); }
+h1 {
+  font-size: clamp(2rem, 7.5vw, 2.75rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -.04em;
+  max-width: 13ch;
+  margin: var(--s3) 0 var(--s4);
+}
+h2 { font-size: 1.3125rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.26; margin: 0 0 var(--s3); }
+p { margin: var(--s3) 0; }
+strong { color: var(--text); font-weight: 600; }
+a { color: var(--cobalt-text); text-underline-offset: 3px; }
+.eyebrow {
+  color: var(--text-3);
+  font-size: .6875rem;
+  letter-spacing: .12em;
+  font-weight: 600;
+  margin: 0;
+}
+.intro { color: var(--text-2); font-size: 1.0625rem; margin-bottom: var(--s5); }
+.muted, small { font-size: .8125rem; color: var(--text-3-up); line-height: 1.55; }
+.error { color: var(--fault-text); background: var(--fault-tint); border: 1px solid var(--fault); border-radius: var(--r-md); padding: var(--s3) var(--s4); font-weight: 500; }
+.status { font-size: .9375rem; color: var(--text-3-up); min-height: 1.2em; }
+.section-title { font-size: 1.0625rem; font-weight: 700; margin: var(--s6) 0 var(--s2); }
+
+/* --- Surfaces ------------------------------------------------------------ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  padding: var(--s5);
+  margin: var(--s4) 0;
+  box-shadow: var(--shadow-panel);
+}
+.install {
+  background: transparent;
+  border: 1px dashed var(--border);
+  box-shadow: none;
+  margin-top: var(--s6);
+}
+.install h2 { font-size: 1.0625rem; }
+
+/* --- Controls ------------------------------------------------------------ */
+button {
+  min-height: 48px;
+  border: 1px solid var(--cobalt-fill);
+  border-radius: var(--r-sm);
+  background: var(--cobalt-fill);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  font-size: .9375rem;
+  padding: 12px 17px;
+  cursor: pointer;
+  transition: background-color var(--t) var(--ease), border-color var(--t) var(--ease), color var(--t) var(--ease);
+}
+button:hover:enabled { background: var(--cobalt-fill-hover); border-color: var(--cobalt-fill-hover); }
+button:disabled { opacity: .5; cursor: wait; }
+button.secondary { background: transparent; color: var(--cobalt-text); border-color: var(--border); }
+button.secondary:hover:enabled { background: var(--cobalt-tint); border-color: var(--cobalt-edge); color: var(--text); }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.full-width { width: 100%; margin-top: var(--s4); }
+form > button { width: 100%; margin-top: var(--s2); }
+
+.tabs, .row { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.tabs { margin: var(--s3) 0 var(--s5); }
+.tabs button { flex: 1; padding: 12px 10px; background: transparent; color: var(--cobalt-text); border-color: var(--border); }
+.tabs button[aria-pressed="true"] {
+  background: var(--cobalt-fill);
+  color: var(--on-accent);
+  border-color: var(--cobalt-fill);
+  box-shadow: inset 0 -3px 0 rgba(255, 255, 255, .35);
+}
+
+label { display: block; font-size: .9375rem; font-weight: 600; color: var(--text); margin: var(--s4) 0 6px; }
+input, select {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--inset);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  padding: 13px;
+  min-height: 48px;
+  margin-bottom: var(--s4);
+}
+::placeholder { color: var(--text-3); opacity: 1; }
+
+/* --- Progress data ------------------------------------------------------- */
+.stat {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -.045em;
+  line-height: 1.05;
+  color: var(--lime-text);
+  margin: var(--s1) 0 var(--s2);
+  font-variant-numeric: tabular-nums;
+}
+.timeline {
+  display: flex;
+  height: 30px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  margin: var(--s4) 0 var(--s3);
+  background: var(--inset);
+}
+.legend { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s4); font-size: .8125rem; color: var(--text-2); }
+.swatch {
+  display: inline-block;
+  width: 11px; height: 11px;
+  border-radius: 3px;
+  margin-right: 6px;
+  border: 1px solid rgba(255, 255, 255, .14);
+}
+.phone-catch { font-size: .875rem; color: var(--coral-text); }
+#content:focus { outline: none; }
+
+footer {
+  text-align: center;
+  font-size: .75rem;
+  color: var(--text-3);
+  padding: var(--s5) 0 0;
+  margin-top: var(--s5);
+  border-top: 1px solid var(--border-soft);
+}
+
+/* --- Web Interface Guidelines pass ---------------------------------------
+   Balanced headings, no double-tap zoom delay on controls, an intentional tap
+   highlight, and notch-safe gutters on full-height phone layouts. ---------- */
+h1, h2, h3, .history-headline, .recovery-stat, .instruction { text-wrap: balance; }
+p, li { text-wrap: pretty; }
+button, select, input, textarea, summary, label.check-label, a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(18, 207, 227, .22);
+}
+.skip-link {
+  position: absolute;
+  left: var(--s4);
+  top: calc(var(--s4) * -4);
+  z-index: 10;
+  padding: 10px var(--s4);
+  border-radius: var(--r-sm);
+  background: var(--cobalt-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: .9375rem;
+  text-decoration: none;
+}
+.skip-link:focus-visible { top: var(--s4); }
+[tabindex="-1"]:focus { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}

@@ -71,7 +71,7 @@ export function bootAccount(doc = document, client = new AccountClient()) {
     currentUser=user;const current=++viewGeneration;
     if (user) googleSignIn?.cancel();
     get("auth-forms").hidden = Boolean(user); get("signed-in").hidden = !user;
-    for (const [id, value] of [["current-name", user?.displayName], ["current-email", user?.email], ["current-role", user?.role]]) get(id).textContent = value || "";
+    for (const [id, value] of [["current-name", user?.displayName], ["current-email", user?.email], ["current-role", user ? user.role === "parent" ? "Parent account" : "Student account" : ""]]) get(id).textContent = value || "";
     status(user ? client.storageAvailable ? "Signed in on this browser tab." : "Signed in for this page. Browser storage is unavailable." : "Ready when you are.");
     void dashboard.setUser(null);
     void settings.setUser(user).then(complete=>{if(current===viewGeneration&&complete)void dashboard.setUser(user);});

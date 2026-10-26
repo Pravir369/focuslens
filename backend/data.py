@@ -93,7 +93,7 @@ def family():
         users=db.session.execute(db.select(User).join(FamilyLink,FamilyLink.student_user_id==User.id).where(FamilyLink.parent_user_id==g.user_id)).scalars()
     else:
         users=db.session.execute(db.select(User).join(FamilyLink,FamilyLink.parent_user_id==User.id).where(FamilyLink.student_user_id==g.user_id)).scalars()
-    return jsonify(links=[dict(email=user.email,displayName=user.display_name) for user in users],reportDefaults=report_defaults(g.user))
+    return jsonify(links=[dict(id=user.id,email=user.email,displayName=user.display_name) for user in users],reportDefaults=report_defaults(g.user))
 
 @api.post('/family-link')
 @require_auth
@@ -108,6 +108,29 @@ def link_family():
         try: db.session.commit()
         except IntegrityError: db.session.rollback()
     return jsonify(linked=True),200 if existing else 201
+
+@api.get('/family/<student_id>/summary')
+@require_auth
+def family_summary(student_id):
+    identifier(student_id)
+    if g.user.role!='parent': return jsonify(error='Only a signed-in parent can view a family summary.'),403
+    linked=db.session.execute(db.select(FamilyLink).where(FamilyLink.parent_user_id==g.user_id,FamilyLink.student_user_id==student_id)).scalar_one_or_none()
+    if linked is None: return jsonify(error='No linked student matches this account.'),403
+    # Aggregate-only, by design: never the event log, a session list, or any
+    # single session's detail. This is the privacy-principle enforcement point.
+    now=time.time()*1000; week=7*24*60*60*1000
+    rows=db.session.execute(db.select(StudySession.end_time,StudySession.engagement_pct,StudySession.avg_recovery_speed_ms).where(
+        StudySession.user_id==student_id,StudySession.end_time.is_not(None),StudySession.import_source!='legacy-pacing',
+        StudySession.end_time>now-2*week)).all()
+    current=[row for row in rows if row.end_time>now-week]
+    previous=[row for row in rows if row.end_time<=now-week]
+    def average(group,field):
+        values=[getattr(row,field) for row in group if getattr(row,field) is not None]
+        return sum(values)/len(values) if values else None
+    this_engagement=average(current,'engagement_pct'); prior_engagement=average(previous,'engagement_pct')
+    trend=this_engagement-prior_engagement if this_engagement is not None and prior_engagement is not None else None
+    return jsonify(sessionsThisWeek=len(current),avgEngagementPct=this_engagement,
+                   avgRecoverySpeedMs=average(current,'avg_recovery_speed_ms'),trendVsPriorWeek=trend)
 
 @api.get('/report-config')
 @require_auth
