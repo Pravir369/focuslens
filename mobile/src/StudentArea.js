@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Button, Card, styles } from './ui';
 import { useResource } from './useResource';
+import { NotificationSettings } from './NotificationSettings';
 import { dateTime, duration, measured, newestFirst, percentage, recentStats, sessionSettings, STATE_COLORS, STATE_LABELS, timeline } from './progress';
 
 function LoadingOrError({ resource }) {
@@ -55,7 +56,7 @@ function SessionDetail({ session, id, onBack }) {
     <Text style={styles.caption}>{settings.policy} · {settings.plan}</Text></Card>
     <Card><Text style={styles.heading}>Distractions & recovery</Text>
       <Text style={styles.body}>{row.distractionCount === 0 ? 'No distractions this session.' : measured(row.distractionCount) ? `${row.distractionCount} distraction${row.distractionCount === 1 ? '' : 's'} recorded.` : 'Distraction count not recorded.'}</Text>
-      <Text style={styles.body}>{measured(row.averageRecoveryMs) ? `Average recovery: ${duration(row.averageRecoveryMs)}.` : row.distractionCount === 0 ? 'No recovery needed.' : 'No recoveries recorded.'}</Text>
+      <Text style={styles.body}>{measured(row.averageRecoveryMs) ? `Average recovery: ${duration(row.averageRecoveryMs)}.` : row.distractionCount === 0 ? 'No recovery needed.' : row.source === 'legacy-summary' ? 'Recovery duration was not recorded in this imported summary.' : 'No recoveries recorded.'}</Text>
       {measured(row.longestDistractionMs) && row.distractionCount !== 0 && <Text style={styles.body}>Longest distraction: {duration(row.longestDistractionMs)}.</Text>}
       <Text style={styles.caption}>Recovery includes only direct returns from distracted to engaged within an uninterrupted active segment.</Text></Card>
     <Card><Text style={styles.heading}>Session timeline</Text>
@@ -72,7 +73,7 @@ export function Profile({ session, user }) {
   return <><Card><Text style={styles.heading}>Your account</Text><Text style={styles.body}>{user.displayName}</Text><Text style={styles.body}>{user.email}</Text><Text style={styles.caption}>{user.role === 'student' ? 'Student' : 'Parent'} account</Text></Card>
     {user.role === 'student' && (family.data ? <Card><Text style={styles.heading}>Linked parents</Text>{family.data.links.length ? family.data.links.map(parent => <View key={parent.email}><Text style={styles.body}>{parent.displayName}</Text><Text style={styles.caption}>{parent.email}</Text></View>) : <Text style={styles.body}>No parent linked yet.</Text>}
       <Text style={styles.caption}>A family link is for aggregate progress. Your private session details are not shared through this companion.</Text><Button secondary onPress={family.reload}>Refresh linked parents</Button></Card> : <LoadingOrError resource={family} />)}
-    <Card><Text style={styles.heading}>Companion settings</Text><Text style={styles.body}>Your laptop manages study duration, phone policy, and report recipients. This first mobile checkpoint shows your saved progress.</Text><Button secondary onPress={() => session.logout()}>Sign out on this device</Button></Card></>;
+    <Card><Text style={styles.heading}>Companion settings</Text><Text style={styles.body}>Your laptop manages study duration, phone policy, and report recipients. This companion shows your saved progress.</Text></Card><NotificationSettings /></>;
 }
 export function StudentArea({ session, user, onNavigate }) {
   const [tab, setTab] = useState('dashboard'), [selected, setSelected] = useState(null);

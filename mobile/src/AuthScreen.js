@@ -20,6 +20,7 @@ export function AuthScreen({ session }) {
   return <Card>
     <Text style={styles.heading}>{mode === 'login' ? 'Welcome back.' : 'Start with an account.'}</Text>
     <Text style={styles.body}>Use the same FocusLens account as your laptop. Camera tracking stays there; this companion brings your progress with you.</Text>
+    <Text style={styles.caption}>New here? Choose Create account below. This Expo Go version uses email and password; Google sign-in is not available here yet.</Text>
     <View style={styles.row}><Button secondary={mode !== 'login'} disabled={busy} onPress={() => { setMode('login'); setPassword(''); setError(''); }}>Sign in</Button>
       <Button secondary={mode !== 'signup'} disabled={busy} onPress={() => { setMode('signup'); setPassword(''); setError(''); }}>Create account</Button></View>
     {mode === 'signup' && <><Text style={styles.label}>Your name</Text><TextInput accessibilityLabel="Your name" testID="signup-name" editable={!busy} style={styles.input} value={displayName} onChangeText={setDisplayName} autoComplete="name" maxLength={100} /></>}

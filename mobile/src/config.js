@@ -5,4 +5,5 @@ export function validateApiUrl(value) {
   if ((url.protocol !== 'https:' && !(local && url.protocol === 'http:')) || url.username || url.password || url.search || url.hash || !['', '/'].includes(url.pathname)) throw new Error('Use an HTTPS backend address without credentials or a path.');
   return url.origin;
 }
-export const API_URL = validateApiUrl(typeof document === 'object' ? window.location.origin : (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL));
+const browserOrigin = typeof document === 'object' && typeof window === 'object' && typeof window.location?.origin === 'string' ? window.location.origin : null;
+export const API_URL = validateApiUrl(browserOrigin || process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL);

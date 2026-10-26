@@ -139,3 +139,13 @@ class WebPushSubscription(db.Model):
     p256dh = db.Column(db.String(128), nullable=False)
     auth = db.Column(db.String(32), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class ExpoPushToken(db.Model):
+    __tablename__ = 'push_tokens'
+    id = db.Column(db.String(36), primary_key=True, default=identifier)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    token = db.Column(db.String(256), nullable=False, unique=True)
+    platform = db.Column(db.String(10), nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    __table_args__ = (CheckConstraint("platform IN ('ios', 'android')", name='valid_platform'),)

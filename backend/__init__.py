@@ -65,6 +65,9 @@ def create_app(test_config=None):
     app.extensions['web_push'] = PushService(app, app.config.get('WEB_PUSH_PRIVATE_KEY', env.get('WEB_PUSH_PRIVATE_KEY', '')),
         app.config.get('WEB_PUSH_SUBJECT', env.get('WEB_PUSH_SUBJECT', '')), app.config.get('WEB_PUSH_SENDER'))
     app.register_blueprint(web_push_api)
+    from .expo_push import ExpoPushService, api as expo_push_api
+    app.extensions['expo_push'] = ExpoPushService(app, app.config.get('EXPO_PUSH_SENDER'), app.config.get('EXPO_PUSH_RECEIPTS'))
+    app.register_blueprint(expo_push_api)
 
     @app.before_request
     def transport_and_origin():

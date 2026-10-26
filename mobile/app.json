@@ -23,8 +23,16 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-notifications"
     ],
-    "scheme": "focuslens"
+    "scheme": "focuslens",
+    "extra": {
+      "eas": {
+        "projectId": "063625c9-aaee-4922-b8f9-88a895eab76c"
+      }
+    },
+    "owner": "pbrahmbhatt6"
   }
 }

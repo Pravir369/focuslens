@@ -56,6 +56,12 @@ node --test tests/*.test.mjs
 .venv/bin/python -m unittest discover -s tests -p 'test_*.py'
 ```
 
+## Phase 3 mobile companion checkpoint
+
+The native Expo app in [`mobile/`](mobile/README.md) is active again (SDK 58): secure email/password signup/login, read-only student progress/history, and opt-in remote-notification registration with a manual test. Native endpoints require the same account JWT and never trust a client-submitted user ID. Notification tickets and provider receipts are reported separately from actual phone delivery. The existing [`companion/`](companion/README.md) Home Screen Web Push app remains usable. Neither companion accesses a camera or microphone.
+
+Before building real distraction alerts or the parent dashboard, verify native login/restoration and notification arrival on the actual iPhone, both foreground and background. Mobile Google remains later in the ordered specification and needs a development build/native OAuth setup; the existing web Google flow is unchanged. See the native README for the exact steps and current limitations.
+
 ## Phase 1 study app
 
 A browser study companion using local face/head-pose, optional phone detection, and optional macOS app-name monitoring. Plain HTML/CSS/JavaScript plus a Python standard-library local server; no build step, framework, or package installation.
