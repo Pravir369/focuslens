@@ -594,8 +594,19 @@ video { width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
   background: var(--inset);
 }
 .timeline > span { flex-basis: 0; min-width: 0; }
-.timeline .phone-catch, .legend .phone-catch { box-shadow: inset 0 4px 0 var(--coral), inset 0 -4px 0 var(--coral); }
-.timeline .window-catch, .legend .window-catch { box-shadow: inset 0 4px 0 var(--violet), inset 0 -4px 0 var(--violet); }
+/* Which detector caught a distraction, hatched in the same language as the
+   paused (135deg) and unclassified (90deg) segments above. Mirrored diagonals
+   carry the distinction without relying on coral-vs-violet alone, and a hatch
+   stays legible on a one-pixel segment where an edge stripe did not. The 1px
+   inset ring closes the segment so a marked run reads as one unit. */
+.timeline .phone-catch, .legend .phone-catch {
+  background-image: repeating-linear-gradient(45deg, var(--coral) 0 2px, transparent 2px 6px);
+  box-shadow: inset 0 0 0 1px var(--coral);
+}
+.timeline .window-catch, .legend .window-catch {
+  background-image: repeating-linear-gradient(135deg, var(--violet) 0 2px, transparent 2px 6px);
+  box-shadow: inset 0 0 0 1px var(--violet);
+}
 
 .legend {
   list-style: none;
