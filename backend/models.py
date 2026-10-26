@@ -55,6 +55,21 @@ class FamilyLink(db.Model):
                      CheckConstraint("parent_user_id != student_user_id", name="different_users"))
 
 
+class UserSettings(db.Model):
+    __tablename__ = "user_settings"
+    user_id = db.Column(db.String(36), db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    goal_minutes = db.Column(db.Integer, nullable=False, default=25, server_default="25")
+    goal_engagement_pct = db.Column(db.Integer, nullable=False, default=80, server_default="80")
+    phone_policy = db.Column(db.String(20), nullable=False, default="phone-free", server_default="phone-free")
+    recipient_emails = db.Column(db.JSON, nullable=True)
+    onboarding_complete = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    __table_args__ = (
+        CheckConstraint("goal_minutes BETWEEN 1 AND 1440", name="duration_range"),
+        CheckConstraint("goal_engagement_pct BETWEEN 0 AND 100", name="target_range"),
+        CheckConstraint("phone_policy IN ('phone-free', 'phone-allowed')", name="phone_policy"),
+    )
+
+
 class StudySession(db.Model):
     __tablename__ = "sessions"
     id = db.Column(db.String(36), primary_key=True, default=identifier)

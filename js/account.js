@@ -2,6 +2,7 @@
 import { bootGoogleSignIn } from "./google-signin.js";
 import { legacySnapshot, acknowledgeLegacy } from "./legacy-import.js";
 import { bootAccountDashboard } from "./account-dashboard.js";
+import { bootAccountSettings } from "./account-settings.js";
 const TOKEN_KEY = "focuslens.auth.token.v1";
 
 export class AccountClient {
@@ -62,14 +63,18 @@ export function bootAccount(doc = document, client = new AccountClient()) {
   let busy = false;
   let googleSignIn;
   const dashboard = bootAccountDashboard(doc,client);
+  let currentUser=null,viewGeneration=0;
+  const settings=bootAccountSettings(doc,client,{onSaved:user=>{if(user?.id===currentUser?.id){status("Settings saved. You’re ready to start a session.");void dashboard.setUser(user);}}});
   function status(message) { get("account-status").textContent = message; }
   function error(message) { get("account-error").textContent = message || ""; get("account-error").hidden = !message; }
   function signedIn(user) {
+    currentUser=user;const current=++viewGeneration;
     if (user) googleSignIn?.cancel();
     get("auth-forms").hidden = Boolean(user); get("signed-in").hidden = !user;
     for (const [id, value] of [["current-name", user?.displayName], ["current-email", user?.email], ["current-role", user?.role]]) get(id).textContent = value || "";
     status(user ? client.storageAvailable ? "Signed in on this browser tab." : "Signed in for this page. Browser storage is unavailable." : "Ready when you are.");
-    void dashboard.setUser(user);
+    void dashboard.setUser(null);
+    void settings.setUser(user).then(complete=>{if(current===viewGeneration&&complete)void dashboard.setUser(user);});
   }
   function setBusy(value) {
     busy = value;

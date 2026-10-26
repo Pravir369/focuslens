@@ -12,6 +12,7 @@ from .report_data import report_summary
 from .session_data import completion, creation, identifier, number, pacing, public_session
 from .tokens import issue_token, require_auth
 from .legacy import LEGACY_FIELDS, import_legacy
+from .preferences import report_defaults
 
 api=Blueprint('data',__name__)
 
@@ -92,7 +93,7 @@ def family():
         users=db.session.execute(db.select(User).join(FamilyLink,FamilyLink.student_user_id==User.id).where(FamilyLink.parent_user_id==g.user_id)).scalars()
     else:
         users=db.session.execute(db.select(User).join(FamilyLink,FamilyLink.parent_user_id==User.id).where(FamilyLink.student_user_id==g.user_id)).scalars()
-    return jsonify(links=[dict(email=user.email,displayName=user.display_name) for user in users],reportDefaults=[g.user.email]+([] if g.user.role=='parent' else [user.email for user in db.session.execute(db.select(User).join(FamilyLink,FamilyLink.parent_user_id==User.id).where(FamilyLink.student_user_id==g.user_id)).scalars()][:1]))
+    return jsonify(links=[dict(email=user.email,displayName=user.display_name) for user in users],reportDefaults=report_defaults(g.user))
 
 @api.post('/family-link')
 @require_auth
@@ -127,7 +128,7 @@ def send_session_report():
     if row.end_time is None or row.import_source!='live': return jsonify(error='Finish and save a study session before sending its report.'),409
     addresses=data.get('recipientEmails')
     if addresses is None: addresses=family().get_json()['reportDefaults']
-    addresses=recipients(addresses)
+    addresses=recipients(addresses,max_count=3)
     if not services().configured: return jsonify(error='Email delivery is not configured on this service yet.'),503
     summary=validate_summary(report_summary(row,event_rows(row)))
     return jsonify(services().queue(g.user_id,summary,addresses)),202

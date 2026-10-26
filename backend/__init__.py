@@ -59,6 +59,8 @@ def create_app(test_config=None):
     from .data import api
     app.extensions["account_services"] = Services(env,app.config.get("REPORT_SENDER"))
     app.register_blueprint(api)
+    from .preferences import preferences
+    app.register_blueprint(preferences)
 
     @app.before_request
     def transport_and_origin():

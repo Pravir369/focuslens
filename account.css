@@ -32,4 +32,10 @@ details { margin-top: 24px; } summary { cursor: pointer; font-weight: 600; }
 .auth-divider { display: flex; gap: 16px; align-items: center; color: #52645b; font-size: .85rem; margin: 24px 0; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #d7e2d9; }
 #google-link-cancel, #google-retry { background: #fff; color: #28664e; }
+.secondary { background: #fff; color: #28664e; }
+#settings-error { color: #8a2828; }
+.recipient-row { margin: 16px 0; }
+.recipient-row button { margin-top: 8px; padding: 6px 12px; font-size: .85rem; }
+#edit-settings { margin: 0 0 12px; }
+#settings-cancel { margin-top: 16px; }
 @media (max-width: 450px) { main { margin-top: 28px; } .card { padding: 20px; } }

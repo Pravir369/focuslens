@@ -48,9 +48,9 @@ class MailConfig:
         return bool(self.username and self.password and self.sender and self.security in ("ssl", "starttls"))
 
 
-def recipients(values):
-    if not isinstance(values, list) or not 1 <= len(values) <= 2:
-        raise ValueError("Enter one or two recipient email addresses.")
+def recipients(values, max_count=2):
+    if not isinstance(values, list) or not 1 <= len(values) <= max_count:
+        raise ValueError("Enter one to three recipient email addresses." if max_count == 3 else "Enter one or two recipient email addresses.")
     result = []
     for value in values:
         if not isinstance(value, str) or len(value) > 254 or not re.fullmatch(r"[^@\s,<>]+@[^@\s,<>]+\.[^@\s,<>]+", value):

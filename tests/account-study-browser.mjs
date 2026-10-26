@@ -22,6 +22,9 @@ get('run').addEventListener('click',async()=>{
   get('run').disabled=true;get('result').textContent='Signing into an isolated synthetic test account…';let integration;
   try{
     const client=new AccountClient();await client.authenticate('signup',{email:`browser-${crypto.randomUUID()}@example.test`,password:crypto.randomUUID(),displayName:'Phase 2 browser test',role:'student'});
+    const apiHeaders={Authorization:`Bearer ${client.token}`,'Content-Type':'application/json'};
+    const prefs=await fetch('/preferences',{method:'PUT',headers:apiHeaders,body:JSON.stringify({goalMinutes:35,goalEngagementPct:75,phonePolicy:'phone-free',recipientEmails:['one@gmail.com','two@example.test','three@gmail.com']})});
+    if(!prefs.ok)throw new Error('Synthetic account preferences could not be saved');
     const source=new DOMParser().parseFromString(await fetch('/study').then(response=>response.text()),'text/html');
     document.querySelector('main')?.remove();document.body.append(source.querySelector('main'));
     let time=0,callbacks,tick;const epoch=Date.now();let stopped=0;
@@ -33,6 +36,7 @@ get('run').addEventListener('click',async()=>{
       createAudioCues:()=>({unlock:async()=>true,play:()=>true,cancel(){},close:async()=>{}}),
       createPhoneTracker:()=>({ready:false,latest:null,async start(){this.ready=true;},async sampleNext(video,desk,now){this.latest={capturedAt:now,present:false,confidence:null,boxes:[]};},invalidateSource(){this.latest=null;},invalidate(){this.latest=null;},stop(){this.ready=false;this.latest=null;}})
     }});
+    if(get('session-length').value!=='custom'||get('custom-length').value!=='35'||get('engagement-goal').value!=='75')throw new Error('Saved session defaults were not applied');
     const feed=(duration,pose='screen')=>{for(let elapsed=0;elapsed<duration;elapsed+=100){time+=100;callbacks?.onFrame({faceDetected:true,pose:{yaw:pose==='side'?40:0,pitch:pose==='notes'?30:0,roll:0},eyeClosedScore:.1,eyeBlinkLeft:.1,eyeBlinkRight:.1},time);tick?.();}};
     get('begin').click();await until(()=>callbacks,'Controlled tracking did not start');feed(200);
     get('calibrate').click();feed(5100);feed(5100,'notes');feed(3100,'side');
@@ -43,6 +47,7 @@ get('run').addEventListener('click',async()=>{
     // Resume requires a fresh controlled camera frame after the pause.
     feed(200);get('resume-session').click();await until(()=>get('resume-session').hidden,'Resume did not finish');feed(1600);
     get('end-session').click();await integration.bridge.flush();
+    if(get('report-email').value!=='one@gmail.com'||get('report-email-extra').value!=='two@example.test'||get('report-email-third').value!=='three@gmail.com')throw new Error('All three saved recipients must prefill the report');
     const row=integration.bridge.current,expected=sessionMetrics(row.session);const stored=await integration.bridge.api.request('/sessions/'+row.id);
     if(stored.distractionCount!==expected.distractionCount||stored.recoveryCount!==expected.recoveryCount||Math.abs(stored.engagedPct-expected.engagedPct)>.01)throw new Error('Stored metrics differ from the existing session metrics');
     if(!stored.activeSegments||stored.activeSegments.length!==2)throw new Error('Pause boundaries were not saved');

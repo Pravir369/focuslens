@@ -9,12 +9,13 @@ function session() {
   value.confirm({ from: "distracted", to: "engaged", at: 8000 }); value.end(10000);
   return value;
 }
-function fixture(fetcher) {
+function fixture(fetcher,recipientIds=["report-email","report-email-extra"]) {
   const fields = { "report-email": { value: "" }, "report-email-extra": { value: "" }, "send-report": { disabled: true }, "report-status": { textContent: "" } };
   const inputs = [fields["report-email"], fields["report-email-extra"]];
+  if(recipientIds.includes('report-email-third')){fields['report-email-third']={value:''};inputs.push(fields['report-email-third']);}
   fields["report-form"] = { addEventListener() {}, removeEventListener() {}, reportValidity: () => true,
     reset() { inputs.forEach((input) => { input.value = ""; }); }, querySelectorAll: () => inputs };
-  const controller = new ReportController({ getElementById: (id) => fields[id] }, "profile-one", { fetcher, delay: (fn) => { queueMicrotask(fn); return 1; }, cancelDelay() {} });
+  const controller = new ReportController({ getElementById: (id) => fields[id] }, "profile-one", { fetcher, recipientIds, delay: (fn) => { queueMicrotask(fn); return 1; }, cancelDelay() {} });
   controller.setSession(session());
   fields["report-email"].value = "student@example.com";
   return { controller, fields };
@@ -24,6 +25,12 @@ test("report reuses summary values, tip, and textual source timeline without cam
   assert.match(value.headlineStats.recovery, /5 seconds/); assert.match(value.patternTip, /phone-related/);
   assert.ok(value.timeline.some((row) => row.state.includes("Camera B")));
   for (const key of ["events", "images", "pose", "calibration"]) assert.equal(Object.hasOwn(value, key), false);
+});
+test('account reports include all three recipients only after explicit submission',async()=>{
+  const calls=[];const f=fixture(async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({status:'accepted',sentCount:3})};},['report-email','report-email-extra','report-email-third']);
+  f.fields['report-email-extra'].value='two@gmail.com';f.fields['report-email-third'].value='three@example.test';assert.equal(calls.length,0);
+  await f.controller.send();assert.deepEqual(JSON.parse(calls[0].options.body).recipientEmails,['student@example.com','two@gmail.com','three@example.test']);
+  assert.equal(f.fields['report-email-third'].value,'');assert.match(f.fields['report-status'].textContent,/3 addresses/);f.controller.dispose();
 });
 test("email is explicit, carries profileId, polls nonblocking, and clears addresses on success", async () => {
   const calls = [];

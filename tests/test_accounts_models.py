@@ -8,7 +8,7 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
 from backend import create_app
-from backend.models import db, User, FamilyLink, StudySession, Event
+from backend.models import db, User, UserSettings, FamilyLink, StudySession, Event
 
 
 class ModelsTests(unittest.TestCase):
@@ -33,13 +33,22 @@ class ModelsTests(unittest.TestCase):
         db.session.rollback()
 
     def test_migrations_round_trip_and_match_models(self):
-        self.assertEqual(set(inspect(db.engine).get_table_names()), {"alembic_version", "users", "family_links", "sessions", "events"})
+        self.assertEqual(set(inspect(db.engine).get_table_names()), {"alembic_version", "users", "user_settings", "family_links", "sessions", "events"})
         from alembic.autogenerate import compare_metadata
         from alembic.migration import MigrationContext
         with db.engine.connect() as connection:
             self.assertEqual(compare_metadata(MigrationContext.configure(connection), db.metadata), [])
         downgrade(revision="base"); self.assertEqual(inspect(db.engine).get_table_names(), ["alembic_version"])
         upgrade(); self.user(); db.session.commit()
+
+    def test_settings_migration_preserves_existing_accounts_and_cascades(self):
+        downgrade(revision='e712fa800001')
+        user=self.user();db.session.commit();owner=user.id
+        upgrade()
+        row=db.session.get(UserSettings,owner)
+        self.assertTrue(row.onboarding_complete);self.assertIsNone(row.recipient_emails)
+        self.assertEqual((row.goal_minutes,row.goal_engagement_pct,row.phone_policy),(25,80,'phone-free'))
+        db.session.delete(user);db.session.commit();self.assertIsNone(db.session.get(UserSettings,owner))
 
     def test_user_constraints_and_public_whitelist(self):
         user = self.user(); db.session.commit()

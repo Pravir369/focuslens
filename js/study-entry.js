@@ -76,6 +76,14 @@ export function accountWindowFetcher(bridge,user){
 export async function startAccountStudy(doc=document,host=window,{appDependencies={},loadVision=()=>import(MEDIAPIPE_MODULE_URL)}={}){
   const client=new AccountClient();const user=await client.restore();
   if(!user){host.location.replace('/');return;}
+  const preferences=await new AccountApi(client).request('/preferences');
+  if(!preferences.onboardingComplete){host.location.replace('/?setup=1');return;}
+  doc.getElementById('phone-policy').value=preferences.phonePolicy;
+  const preset=[...doc.getElementById('session-length').options].some(option=>option.value===String(preferences.goalMinutes));
+  doc.getElementById('session-length').value=preset?String(preferences.goalMinutes):'custom';
+  doc.getElementById('custom-length').value=preferences.goalMinutes;
+  doc.getElementById('custom-length').disabled=preset;doc.getElementById('custom-length').required=!preset;doc.getElementById('custom-length-field').hidden=preset;
+  doc.getElementById('engagement-goal').value=preferences.goalEngagementPct;doc.getElementById('goal-range').value=preferences.goalEngagementPct;
   const top=doc.createElement('section');top.className='card';
   const title=doc.createElement('p');title.textContent=`Signed in as ${user.displayName} · ${user.email}`;
   const status=doc.createElement('p');status.id='account-sync-status';status.setAttribute('role','status');
@@ -85,7 +93,7 @@ export async function startAccountStudy(doc=document,host=window,{appDependencie
   top.append(title,status,retry,doc.createTextNode(' '),account,doc.createTextNode(' '),logout);doc.querySelector('main header').after(top);
   const bridge=new AccountStudy(client,user,{notify:message=>{status.textContent=message;retry.hidden=!bridge.failures.size;
     const saved=doc.getElementById('summary-save-status');if(saved&&message==='Session saved to your account.')saved.textContent=message;},render:records=>renderAccountHistory(doc,records)});
-  await bridge.refresh();const [family,email]=await Promise.all([bridge.api.request('/family-link'),bridge.api.request('/report-config')]);
+  await bridge.refresh();const email=await bridge.api.request('/report-config');
   // Account-mode copy replaces only obsolete local-storage/privacy statements.
   for(const paragraph of doc.querySelectorAll('p')){
     if(paragraph.textContent.includes('Optional history keeps summary statistics'))paragraph.textContent='Tracking libraries and models download over the network. Camera processing stays in your browser. When a session ends, its confirmed states, timing and summary are saved to your account; images, calibration and head-pose readings are never uploaded.';
@@ -99,6 +107,14 @@ export async function startAccountStudy(doc=document,host=window,{appDependencie
   doc.getElementById('profile-status').textContent='Account-backed sessions. Confirmed event records sync at session completion.';
   const reportFactory=(document)=>{
     let controller;
+    const form=document.getElementById('report-form');
+    form.querySelector('label[for="report-email"]').textContent='Recipient 1';
+    form.querySelector('label[for="report-email-extra"]').textContent='Recipient 2 (optional)';
+    const label=document.createElement('label');label.htmlFor='report-email-third';label.textContent='Recipient 3 (optional)';
+    const third=document.createElement('input');third.id='report-email-third';third.type='email';third.autocomplete='off';third.maxLength=254;
+    form.insertBefore(label,document.getElementById('send-report'));form.insertBefore(third,document.getElementById('send-report'));
+    form.querySelector('p').textContent='These are your saved report recipients. Changes here apply to this report only. Nothing sends until you choose Send Report.';
+    const recipientIds=['report-email','report-email-extra','report-email-third'];
     const fetcher=async(url,options={})=>{
       if(url==='/send-report'){
         const session=controller.session;await bridge.save(session);
@@ -108,10 +124,10 @@ export async function startAccountStudy(doc=document,host=window,{appDependencie
       }
       const result=await bridge.api.request(url.split('?')[0],{signal:options.signal});return {ok:true,json:async()=>result};
     };
-    controller=new ReportController(document,user.id,{fetcher});
+    controller=new ReportController(document,user.id,{fetcher,recipientIds});
     const original=controller.setSession.bind(controller);
-    controller.setSession=session=>{original(session);if(session){document.getElementById('report-email').value=family.reportDefaults[0]||user.email;document.getElementById('report-email-extra').value=family.reportDefaults[1]||'';
-      controller.output.textContent=email.configured?'Sending uses the saved account session. You can change either recipient.':'Email-provider setup is still needed on this service.';}};
+    controller.setSession=session=>{original(session);if(session){recipientIds.forEach((id,index)=>{document.getElementById(id).value=preferences.recipientEmails[index]||'';});
+      controller.output.textContent=email.configured?'Sending uses the saved account session. You can change any recipient.':'Email-provider setup is still needed on this service.';}};
     return controller;
   };
   const windowsFactory=(ignored,options)=>new WindowSignal(user.id,{...options,fetcher:accountWindowFetcher(bridge,user)});

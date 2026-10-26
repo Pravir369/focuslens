@@ -52,8 +52,38 @@
   <section id="signed-in" class="card" aria-labelledby="signed-in-title" hidden>
     <h2 id="signed-in-title">You’re signed in.</h2>
     <p id="current-name"></p><p id="current-email"></p><p id="current-role" class="muted"></p>
-    <p><a class="button-link" href="/study">Open study session</a></p>
+    <p><a id="open-study" class="button-link" href="/study" hidden>Open study session</a></p>
+    <button id="edit-settings" type="button" hidden>Edit study and report settings</button>
     <button id="sign-out" type="button">Sign out</button>
+  </section>
+  <section id="account-onboarding" class="card" aria-labelledby="onboarding-title" hidden>
+    <p id="onboarding-progress" class="eyebrow">Step 1 of 2</p>
+    <h2 id="onboarding-title" tabindex="-1">Make FocusLens yours.</h2>
+    <p id="settings-status" role="status" aria-live="polite"></p>
+    <p id="settings-error" role="alert" hidden></p>
+    <button id="settings-retry" type="button" hidden>Retry loading settings</button>
+    <form id="study-settings-form" hidden>
+      <p class="muted">Choose your starting settings. You can change them before each session.</p>
+      <label for="default-minutes">Default session length (minutes)</label>
+      <input id="default-minutes" type="number" min="1" max="1440" step="1" value="25" required>
+      <p class="muted">This is your starting duration when there is no pacing suggestion from past sessions.</p>
+      <label for="default-goal">Engagement goal (%)</label>
+      <input id="default-goal" type="number" min="0" max="100" step="1" value="80" required>
+      <label for="default-phone-policy">Phone policy</label>
+      <select id="default-phone-policy"><option value="phone-free">Phone-free</option><option value="phone-allowed">Studying with phone</option></select>
+      <p class="muted">Phone-free counts a visible phone as a distraction, even beside your notes. Studying with phone ignores phone detection.</p>
+      <button type="submit">Next: report recipients</button>
+    </form>
+    <form id="recipient-settings-form" hidden>
+      <p>Where should your session reports go?</p>
+      <p class="muted">Add your Gmail or another email address, plus up to two other recipients. These addresses are saved to your account. Nothing is emailed until you choose Send Report after a session.</p>
+      <div id="settings-recipients"></div>
+      <button id="add-settings-recipient" type="button" class="secondary">Add another recipient</button>
+      <p id="recipient-count" class="muted" aria-live="polite"></p>
+      <button type="submit" id="save-settings">Save and continue</button>
+      <button type="button" id="settings-back" class="secondary">Back</button>
+    </form>
+    <button type="button" id="settings-cancel" class="secondary" hidden>Cancel changes</button>
   </section>
   <section id="account-dashboard" class="card" hidden>
     <h2>Your study history</h2>

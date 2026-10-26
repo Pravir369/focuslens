@@ -47,7 +47,7 @@ export function bootAccountDashboard(doc,client) {
   }
   get('family-link-form').addEventListener('submit',async event=>{
     event.preventDefault(); const current=generation;
-    try { await api.request('/family-link',{method:'POST',body:{studentEmail:get('student-email').value.trim()}}); if(current!==generation)return; get('family-link-form').reset();status('Student linked. Their email-report defaults now include your stored parent address.');await load(current); }
+    try { await api.request('/family-link',{method:'POST',body:{studentEmail:get('student-email').value.trim()}}); if(current!==generation)return; get('family-link-form').reset();status('Student linked. They can include your email in their report settings.');await load(current); }
     catch(error){if(current===generation)status(error.message);}
   });
   get('legacy-import-file').addEventListener('change',async()=>{

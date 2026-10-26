@@ -20,8 +20,8 @@ export function sessionReport(session) {
 }
 
 export class ReportController {
-  constructor(document, profileId, { fetcher = (...args) => fetch(...args), delay = (callback) => setTimeout(callback, 1000), cancelDelay = (timer) => clearTimeout(timer) } = {}) {
-    Object.assign(this, { document, profileId, fetcher, delay, cancelDelay });
+  constructor(document, profileId, { fetcher = (...args) => fetch(...args), delay = (callback) => setTimeout(callback, 1000), cancelDelay = (timer) => clearTimeout(timer), recipientIds = ["report-email", "report-email-extra"] } = {}) {
+    Object.assign(this, { document, profileId, fetcher, delay, cancelDelay, recipientIds });
     this.form = document.getElementById("report-form");
     this.output = document.getElementById("report-status");
     this.button = document.getElementById("send-report");
@@ -42,7 +42,7 @@ export class ReportController {
   async send() {
     if (!this.session || this.busy || !this.form.reportValidity()) return;
     const generation = this.generation;
-    const addresses = ["report-email", "report-email-extra"].map((id) => this.document.getElementById(id).value.trim()).filter(Boolean);
+    const addresses = this.recipientIds.map((id) => this.document.getElementById(id).value.trim()).filter(Boolean);
     const body = { profileId: this.profileId, sessionSummary: sessionReport(this.session), recipientEmails: addresses };
     this.busy = true; this.button.disabled = true;
     this.form.querySelectorAll("input").forEach((input) => { input.disabled = true; });

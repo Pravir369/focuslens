@@ -113,7 +113,7 @@ class DataTests(unittest.TestCase):
         result=self.client.post('/monitor/claim',json={'pairCode':pair}); self.assertEqual(result.status_code,201)
         self.tokens['monitor']=result.get_json()['token']
         self.assertEqual(self.client.post('/monitor/claim',json={'pairCode':pair}).status_code,401)
-        for route in ['/auth/me','/sessions','/family-link']:
+        for route in ['/auth/me','/sessions','/family-link','/preferences']:
             self.assertEqual(self.call('GET',route,user='monitor').status_code,401)
         activity=dict(revision=1,active=True,monitorEnabled=True,allowedApps=['Preview'])
         self.assertEqual(self.call('PUT','/sessions/'+self.sid+'/activity',activity).status_code,200)

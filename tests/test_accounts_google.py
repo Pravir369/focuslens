@@ -55,6 +55,7 @@ class GoogleTests(unittest.TestCase):
         self.assertIsNone(user.password_hash); self.assertEqual(user.google_id, "test-google-sub")
         self.assertEqual(user.role, "parent")
         self.assertEqual(self.client.get("/auth/me", headers={"Authorization": "Bearer " + result["token"]}).get_json()["id"], user.id)
+        self.assertFalse(self.client.get('/preferences',headers={'Authorization':'Bearer '+result['token']}).get_json()['onboardingComplete'])
         self.assertEqual(self.fetch.call_args.kwargs["timeout"], 10)
         # Clearing the browser challenge means a callback cannot be reused.
         self.assertEqual(self.post().status_code, 401)
