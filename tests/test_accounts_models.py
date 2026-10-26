@@ -33,7 +33,7 @@ class ModelsTests(unittest.TestCase):
         db.session.rollback()
 
     def test_migrations_round_trip_and_match_models(self):
-        self.assertEqual(set(inspect(db.engine).get_table_names()), {"alembic_version", "users", "user_settings", "family_links", "sessions", "events", "web_push_subscriptions", "push_tokens"})
+        self.assertEqual(set(inspect(db.engine).get_table_names()), {"alembic_version", "users", "user_settings", "family_links", "sessions", "events", "web_push_subscriptions", "push_tokens", "parent_alerts"})
         from alembic.autogenerate import compare_metadata
         from alembic.migration import MigrationContext
         with db.engine.connect() as connection:

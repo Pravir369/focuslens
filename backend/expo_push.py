@@ -1,4 +1,4 @@
-"""Native push checkpoint: opt-in registrations and manual self-tests only.
+"""Account-owned native registrations, manual self-tests and provider transport.
 
 Tokens are device credentials: never log them or put them in URLs/responses.
 Expo tickets and APNs/FCM receipts are not proof of delivery to a phone.
@@ -46,10 +46,21 @@ class ExpoPushService:
         return payload.get('data')
 
     def deliver(self, token, job_id):
-        data = self.post('send', {'to': token, 'title': 'FocusLens test',
+        return self.send_message({'to': token, 'title': 'FocusLens test',
             'body': 'This is a manual notification test. No study data is included.',
             'sound': 'default', 'channelId': 'focuslens', 'ttl': 60,
             'data': {'kind': 'test', 'testId': job_id}})
+
+    def deliver_alert(self, token, alert_id):
+        # Lock-screen text and data never reveal a student's identity, timings,
+        # scores, session ID, or private events. Open the authenticated rollup.
+        return self.send_message({'to': token, 'title': 'FocusLens',
+            'body': 'A linked student may appreciate a study check-in. Open FocusLens when convenient.',
+            'sound': 'default', 'channelId': 'focuslens', 'ttl': 300,
+            'data': {'kind': 'study-check-in'}})
+
+    def send_message(self, body):
+        data = self.post('send', body)
         if not isinstance(data, dict): raise ProviderError()
         if data.get('status') != 'ok':
             raise ProviderError((data.get('details') or {}).get('error', 'Unavailable'))

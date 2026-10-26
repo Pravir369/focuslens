@@ -368,6 +368,7 @@ export function boot(loadVision, overrides = {}) {
     ui["resume-session"].hidden = !paused;
     ui["resume-session"].disabled = !readyToResume() || sessionActionPending;
     const event = session.events.at(-1);
+    deps.onSessionObserved?.(session, at(), !paused && latestRaw !== null);
     for (const stage of nudges.update(event, at(), !paused, latestRaw !== null)) {
       if (!audio.play(stage)) {
         set("audio-status", "Sound is unavailable. Visual reminders remain active.");

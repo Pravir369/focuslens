@@ -5,6 +5,7 @@ import { AccountApi } from './account-api.js';
 import { ReportController } from './reports.js';
 import { WindowSignal } from './window-signal.js';
 import { renderHistory } from './history-view.js';
+import { ParentAlertObserver } from './parent-alerts.js';
 
 function renderAccountHistory(doc,records){
   renderHistory(doc,records);
@@ -93,6 +94,15 @@ export async function startAccountStudy(doc=document,host=window,{appDependencie
   top.append(title,status,retry,doc.createTextNode(' '),account,doc.createTextNode(' '),logout);doc.querySelector('main header').after(top);
   const bridge=new AccountStudy(client,user,{notify:message=>{status.textContent=message;retry.hidden=!bridge.failures.size;
     const saved=doc.getElementById('summary-save-status');if(saved&&message==='Session saved to your account.')saved.textContent=message;},render:records=>renderAccountHistory(doc,records)});
+  const alertStatus=doc.createElement('p');alertStatus.setAttribute('role','status');top.append(alertStatus);
+  const alerts=new ParentAlertObserver(async(session,payload,isCurrent)=>{
+    await bridge.ensureCreated(session);
+    // An expired connection must not send an alert for a finished/paused event.
+    const event=session.events.at(-1);
+    if(!isCurrent()||doc.hidden||session.state!=='running'||event?.end!==null||Math.round(event.start)!==payload.eventStartMs)return null;
+    return bridge.api.request('/notify-parent',{method:'POST',body:{sessionId:bridge.row(session).id,...payload}});
+  },{notify:message=>{alertStatus.textContent=message;}});
+  const alertInfo=doc.createElement('p');alertInfo.textContent='If you have linked parents with connected phones, ten continuous minutes of confirmed distraction requests one generic check-in notification. Camera images stay on this device. Pauses and unusable readings reset this timer.';top.append(alertInfo);
   await bridge.refresh();const email=await bridge.api.request('/report-config');
   // Account-mode copy replaces only obsolete local-storage/privacy statements.
   for(const paragraph of doc.querySelectorAll('p')){
@@ -133,10 +143,12 @@ export async function startAccountStudy(doc=document,host=window,{appDependencie
   const windowsFactory=(ignored,options)=>new WindowSignal(user.id,{...options,fetcher:accountWindowFetcher(bridge,user)});
   const app=boot(loadVision,{document:doc,createProfile:()=>({getId:()=>user.id,message:'Signed in. No local profile ID is used for authorization.'}),
     createHistoryStore:()=>bridge.history,createPacingStore:()=>bridge.pacing,createReportController:reportFactory,createWindowSignal:windowsFactory,
-    ...appDependencies,onSessionStarted:session=>{bridge.started(session);appDependencies.onSessionStarted?.(session);},makeSessionId:()=>bridge.current.id});
+    ...appDependencies,onSessionStarted:session=>{bridge.started(session);appDependencies.onSessionStarted?.(session);},
+    onSessionObserved:(session,now,usable)=>{alerts.update(session,now,usable);appDependencies.onSessionObserved?.(session,now,usable);},makeSessionId:()=>bridge.current.id});
   doc.getElementById('history-start-status').textContent='Completed sessions save to your account.';
   retry.addEventListener('click',()=>{void bridge.retry().catch(()=>{});});
-  logout.addEventListener('click',async()=>{logout.disabled=true;try{app.endSession();await bridge.flush();await bridge.api.request('/monitor/revoke',{method:'POST',body:{}});app.dispose();client.logout();host.location.assign('/');}catch(error){status.textContent=error.message;logout.disabled=false;}});
+  logout.addEventListener('click',async()=>{logout.disabled=true;try{app.endSession();await bridge.flush();await bridge.api.request('/monitor/revoke',{method:'POST',body:{}});alerts.dispose();app.dispose();client.logout();host.location.assign('/');}catch(error){status.textContent=error.message;logout.disabled=false;}});
+  host.addEventListener('pagehide',()=>alerts.dispose(),{once:true});
   host.addEventListener('beforeunload',event=>{if(bridge.pending.size||bridge.failures.size){event.preventDefault();event.returnValue='';}});
   return {app,bridge};
 }

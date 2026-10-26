@@ -55,7 +55,7 @@ class ExpoPushTests(unittest.TestCase):
         token = issue_token(user, purpose='monitor', device_id='synthetic-device')['token']
         self.assertEqual(self.client.post('/push-tokens', json={'token': self.token, 'platform': 'ios'}, headers={'Authorization': 'Bearer '+token}).status_code, 401)
 
-    def test_validation_device_limit_cascade_and_no_real_alert_route(self):
+    def test_validation_device_limit_and_cascade(self):
         for token in [None, 'https://evil.test', 'ExpoPushToken[]', 'ExpoPushToken[bad spaces]', 'ExpoPushToken['+'a'*201+']']:
             self.assertEqual(self.register(token=token).status_code, 400)
         for platform in [None, 'web', 'macos', 2]: self.assertEqual(self.register(platform=platform).status_code, 400)
@@ -63,7 +63,7 @@ class ExpoPushTests(unittest.TestCase):
         self.assertEqual(self.register().status_code, 409)
         user = db.session.get(User, self.users[0]['user']['id']); db.session.delete(user); db.session.commit()
         self.assertEqual(db.session.scalar(db.select(db.func.count()).select_from(ExpoPushToken)), 0)
-        self.assertIn(self.client.post('/notify-parent').status_code, (404,405))
+        self.assertEqual(self.client.post('/notify-parent').status_code, 401)
 
     def test_jobs_are_owned_rate_limited_and_distinguish_tickets_from_receipts(self):
         rid = self.register().get_json()['registrationId']

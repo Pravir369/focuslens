@@ -149,3 +149,26 @@ class ExpoPushToken(db.Model):
     platform = db.Column(db.String(10), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
     __table_args__ = (CheckConstraint("platform IN ('ios', 'android')", name='valid_platform'),)
+
+
+class ParentAlert(db.Model):
+    """Durable send claim, not a copy of the session's private event log.
+
+    A crash must not turn a possibly delivered notification into another send.
+    Status counts are Expo acceptance only, never proof of phone delivery.
+    """
+    __tablename__ = 'parent_alerts'
+    id = db.Column(db.String(36), primary_key=True, default=identifier)
+    session_id = db.Column(db.String(36), db.ForeignKey('sessions.id', ondelete='CASCADE'), nullable=False, index=True)
+    event_start_ms = db.Column(db.BigInteger, nullable=False)
+    distraction_duration_ms = db.Column(db.BigInteger, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utc_now)
+    status = db.Column(db.String(20), nullable=False, default='sending')
+    accepted_count = db.Column(db.Integer, nullable=False, default=0)
+    failed_count = db.Column(db.Integer, nullable=False, default=0)
+    __table_args__ = (
+        UniqueConstraint('session_id', 'event_start_ms'),
+        CheckConstraint('distraction_duration_ms >= 600000', name='minimum_duration'),
+        CheckConstraint('accepted_count >= 0 AND failed_count >= 0', name='delivery_counts'),
+        CheckConstraint("status IN ('sending', 'accepted', 'partial', 'failed', 'noRecipients')", name='valid_status'),
+    )
