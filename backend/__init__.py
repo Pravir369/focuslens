@@ -18,8 +18,8 @@ migrate = Migrate()
 def create_app(test_config=None):
     env = local_environment(ROOT / ".env")
     app = Flask(__name__, static_folder=None, instance_path=str(ROOT / ".instance"))
-    production = env.get("FOCUSLENS_ENV", "development") == "production"
-    origin = env.get("PUBLIC_ORIGIN", "http://localhost:8001").rstrip("/")
+    production = env.get("FOCUSLENS_ENV", "development") == "production" or env.get("RENDER") == "true"
+    origin = (env.get("PUBLIC_ORIGIN") or env.get("RENDER_EXTERNAL_URL") or "http://localhost:8001").rstrip("/")
     uri = env.get("DATABASE_URL") or f"sqlite:///{ROOT / '.instance' / 'focuslens.sqlite3'}"
     if uri.startswith("postgres://"): uri = uri.replace("postgres://", "postgresql+psycopg://", 1)
     elif uri.startswith("postgresql://"): uri = uri.replace("postgresql://", "postgresql+psycopg://", 1)

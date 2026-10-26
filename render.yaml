@@ -1,0 +1,31 @@
+{
+  "services": [
+    {
+      "type": "web",
+      "name": "focuslens-accounts",
+      "runtime": "python",
+      "plan": "free",
+      "region": "oregon",
+      "branch": "main",
+      "autoDeployTrigger": "off",
+      "buildCommand": "pip install -r requirements.txt",
+      "startCommand": "python -m flask --app backend:create_app db upgrade && exec gunicorn 'backend:create_app()' --bind 0.0.0.0:$PORT --workers 1 --threads 4",
+      "envVars": [
+        { "key": "FOCUSLENS_ENV", "value": "production" },
+        { "key": "TRUST_PROXY", "value": "1" },
+        { "key": "JWT_SECRET_KEY", "generateValue": true },
+        { "key": "DATABASE_URL", "fromDatabase": { "name": "focuslens-db", "property": "connectionString" } }
+      ]
+    }
+  ],
+  "databases": [
+    {
+      "name": "focuslens-db",
+      "plan": "free",
+      "region": "oregon",
+      "databaseName": "focuslens",
+      "user": "focuslens",
+      "ipAllowList": []
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import jwt
 from flask import g, jsonify
@@ -77,6 +78,21 @@ class TokenTests(unittest.TestCase):
         response=self.client.get("/auth/me", headers={"Authorization": "Bearer " + self.token}, base_url="https://accounts.example.test")
         self.assertEqual(response.status_code, 200)
         self.assertIn("max-age=", response.headers["Strict-Transport-Security"])
+
+    def test_render_origin_defaults_and_production_guards_without_a_database_connection(self):
+        env={"RENDER": "true", "RENDER_EXTERNAL_URL": "https://focuslens-test.onrender.com", "JWT_SECRET_KEY": self.key,
+             "DATABASE_URL": "postgresql://test_user:test_password@database.invalid/focuslens", "TRUST_PROXY": "1"}
+        with patch("backend.local_environment", return_value=env):
+            app=create_app({"BCRYPT_ROUNDS": 4})
+        self.assertTrue(app.config["PRODUCTION"])
+        self.assertEqual(app.config["PUBLIC_ORIGIN"], env["RENDER_EXTERNAL_URL"])
+        self.assertEqual(app.config["TRUSTED_HOSTS"], ["focuslens-test.onrender.com"])
+        self.assertTrue(app.config["SQLALCHEMY_DATABASE_URI"].startswith("postgresql+psycopg://"))
+        client=app.test_client()
+        self.assertEqual(client.get("/health",base_url="http://focuslens-test.onrender.com").status_code,426)
+        self.assertEqual(client.get("/health",base_url="https://focuslens-test.onrender.com").status_code,200)
+        self.assertEqual(client.get("/health",base_url="https://attacker.invalid").status_code,400)
+        with app.app_context(): db.engine.dispose()
 
 
 if __name__ == "__main__": unittest.main()
