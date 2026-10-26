@@ -124,7 +124,7 @@ class GoogleCompanionTests(unittest.TestCase):
         store.rows={str(index):{'expiresAt':time.monotonic()+600} for index in range(1000)}
         self.assertEqual(self.phone.post(PREFIX+'/start',json={'challenge':self.challenge,'role':'student'}).status_code,503)
         with self.phone.get(PREFIX) as page:
-            self.assertEqual(page.status_code,200);self.assertEqual(page.headers['Referrer-Policy'],'no-referrer')
+            self.assertEqual(page.status_code,200);self.assertEqual(page.headers['Referrer-Policy'],'strict-origin-when-cross-origin')
             self.assertEqual(page.headers['Cache-Control'],'no-store');self.assertIn("frame-ancestors 'none'",page.headers['Content-Security-Policy'])
             self.assertEqual(page.headers['Permissions-Policy'],'camera=(), microphone=(), geolocation=()')
         self.assertEqual(self.phone.post(PREFIX+'/start',json={'challenge':self.challenge,'role':'student'},headers={'Origin':'https://evil.test'}).status_code,403)

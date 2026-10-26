@@ -68,7 +68,9 @@ def guard():
 
 @api.after_request
 def private_headers(response):
-    response.headers['Referrer-Policy'] = 'no-referrer'
+    # GIS needs the application origin. Cross-origin requests still receive
+    # only that origin, never the public flow ID/query string.
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
 
 

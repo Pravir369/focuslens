@@ -104,7 +104,7 @@ def create_app(test_config=None):
             response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/; style-src 'self'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/ https://storage.googleapis.com/mediapipe-models/; worker-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; manifest-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         if request.path.startswith('/auth/google/companion'):
-            response.headers['Referrer-Policy'] = 'no-referrer'
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
             response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
         if request.path.startswith('/companion'):
             response.headers['Content-Security-Policy'] = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
