@@ -34,9 +34,9 @@ The phone generates a 256-bit private verifier with Expo Crypto and sends only i
 
 Flows expire after ten minutes, are bounded/rate-limited, and are lost on a backend restart. There is no polling loop, custom app redirect, third-party OAuth proxy, additional Google API access or browser credential storage. Provider errors are not logged. The browser page disables camera/microphone/geolocation and uses no-store, origin-only cross-origin referrers (required for GIS origin checks), and the existing restrictive Google CSP. Both Google pages use a fresh response nonce for GIS's injected button stylesheet; inline scripts and unrelated inline styles remain blocked. Role is chosen only for a new account; existing users keep their database role.
 
-The original `/auth/google/config` + `/auth/google` web cookie path remains separate. Regression tests exercise real RSA verification and account linking for both transports, including mixed browser cookies and one-use exchanges. **Real phone browser return and Google consent/login still require user verification.** The browser test environment loaded Google's actual button but did not complete an authenticated Google callback; do not describe that as a successful real sign-in. Check the existing web login with the same real Google account as well.
+The original `/auth/google/config` + `/auth/google` web cookie path remains separate. Regression tests exercise real RSA verification and account linking for both transports, including mixed browser cookies and one-use exchanges. **On October 26, 2026, the user confirmed Google sign-in worked in both the Expo Go app and existing website.** This is real user verification, separate from automated and browser-button checks. Cold-start secure sign-in restoration and actual phone notification delivery remain unverified.
 
-After the Google check, resume the foreground/background push checkpoint. Actual study alerts and parent rollups/UI still wait for it.
+The next checkpoint is foreground/background push delivery. Actual study alerts and parent rollups/UI still wait for it.
 
 ## Verification
 
