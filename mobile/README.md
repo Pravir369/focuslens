@@ -2,7 +2,9 @@
 
 The user resumed the native React Native/Expo JavaScript companion after the free [Home Screen web companion](../companion/README.md) checkpoint. Both remain available. Camera detection stays on the laptop; neither companion accesses the camera or microphone.
 
-This SDK 58 app uses the existing hosted email/password signup, login and identity routes. Its JWT is held in `expo-secure-store`, verified against `/auth/me` on restore, and erased on sign-out. Passwords are not saved. Students have a Dashboard, paginated History, private session details/timeline, linked-parent list and Profile. Missing imported data remains unknown. Parent rollups/linking await the ordered push checkpoint.
+This SDK 58 app uses the existing hosted email/password signup, login and identity routes. Its JWT is held in `expo-secure-store`, verified against `/auth/me` on restore, and erased on sign-out. Passwords are not saved. Students have a Dashboard, paginated History, private session details/timeline, linked-parent list and Profile. Missing imported data remains unknown.
+
+Parents have a Dashboard (a weekly `GET /family/:studentUserId/summary` rollup per linked student — sessions this week, average engagement, average recovery, and the trend against the prior week), Link a student (`POST /family-link` by the student's account email, reusing the same endpoint the web app's Family settings already use), and Profile/notifications. The rollup is aggregate-only by design: no event, session, or per-session detail ever reaches the parent app, matching the same privacy boundary a family link has always had on the web. An unlinked parent sees an empty state pointing at Link a student instead of an error.
 
 ## Run on an iPhone
 
@@ -14,7 +16,7 @@ Choose Student (or Parent), then **Continue with Google**, or choose **Create ac
 
 ## Manual remote-notification checkpoint
 
-1. Sign in on a real phone and open **Profile → Phone notifications** (the Parent placeholder also includes these controls).
+1. Sign in on a real phone and open **Profile → Phone notifications** (Student and Parent accounts both reach this through their own Profile tab).
 2. Tap **Connect notifications**, approve the phone's notification prompt, then tap **Send test notification**. Confirm a banner arrives while FocusLens is open. A matching foreground receipt is also shown in the app when observed.
 3. Wait at least one minute. Send another test and immediately return to the phone's Home Screen; confirm arrival in the background. Check phone Focus/notification settings if banners or sounds are suppressed.
 4. **Check test status** distinguishes sending, Expo acceptance and APNs/FCM receipt. None proves delivery to the phone. Receipts are checked after 15 minutes. Test jobs disappear on server restart and expire after an hour; registrations remain in PostgreSQL.

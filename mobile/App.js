@@ -6,7 +6,8 @@ import { AuthSession } from './src/session';
 import { secureSessionStorage } from './src/secure-session';
 import { AuthScreen } from './src/AuthScreen';
 import { Button, Card, styles } from './src/ui';
-import { Profile, StudentArea } from './src/StudentArea';
+import { StudentArea } from './src/StudentArea';
+import { ParentArea } from './src/ParentArea';
 import { NotificationProvider } from './src/NotificationSettings';
 const session = new AuthSession(secureSessionStorage);
 
@@ -22,7 +23,7 @@ export default function App() {
           : auth.phase === 'error' ? <Card><Text accessibilityRole="alert" style={styles.error}>{auth.error}</Text><Button onPress={() => session.restore()}>Retry connection</Button><Button secondary onPress={() => session.logout()}>Sign out on this device</Button></Card>
           : auth.phase === 'signedOut' ? <>{Boolean(auth.error) && <Text style={styles.error}>{auth.error}</Text>}<AuthScreen session={session} /></>
           : <NotificationProvider key={auth.user.id} session={session}>{auth.user.role === 'student' ? <StudentArea session={session} user={auth.user} onNavigate={scrollToTop} />
-          : <><Card><Text style={styles.heading}>Parent account connected.</Text><Text style={styles.body}>The parent dashboard comes after the real-device push checkpoint. You can connect this phone and send a test below. Your student’s private history is not available here.</Text></Card><Profile session={session} user={auth.user} /></>}</NotificationProvider>}
+          : <ParentArea session={session} user={auth.user} onNavigate={scrollToTop} />}</NotificationProvider>}
         <Text style={styles.footer}>Camera images stay on your laptop. This app does not access your camera or microphone.</Text>
       </ScrollView>
     </KeyboardAvoidingView>
