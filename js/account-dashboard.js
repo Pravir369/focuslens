@@ -15,7 +15,7 @@ export function bootAccountDashboard(doc,client) {
       get('account-history').replaceChildren();
       for (const row of data.sessions.slice().reverse()) {
         const tr=doc.createElement('tr');
-        for(const value of [new Date(row.endTime).toLocaleString(),row.source==='legacy-summary'?'Imported summary':`${Math.round(row.activeMs/60000*10)/10} min`,row.engagedPct===null?'No classified time':`${row.engagedPct.toFixed(1)}%`,row.averageRecoveryMs===null?'No recoveries recorded':`${(row.averageRecoveryMs/1000).toFixed(1)} s`]) {
+        for(const value of [new Date(row.endTime).toLocaleString(),row.source==='legacy-summary'?'Imported summary':`${Math.round(row.activeMs/60000*10)/10} min`,row.engagedPct===null?'No classified time':`${row.engagedPct.toFixed(1)}%`,row.averageRecoveryMs===null?(row.distractionCount?'No recoveries recorded':'No distractions this session'):`${(row.averageRecoveryMs/1000).toFixed(1)} s`]) {
           const td=doc.createElement('td'); td.textContent=value; tr.append(td);
         }
         get('account-history').append(tr);

@@ -6,6 +6,13 @@ import { ReportController } from './reports.js';
 import { WindowSignal } from './window-signal.js';
 import { renderHistory } from './history-view.js';
 
+function renderAccountHistory(doc,records){
+  renderHistory(doc,records);
+  const rows=doc.getElementById('history-rows').rows;
+  if(!records.length&&rows[0]?.cells[0])rows[0].cells[0].textContent='No saved sessions yet. Complete a session to start your account history.';
+  records.forEach((record,index)=>{if(record.source==='legacy-summary'&&rows[index]?.cells[0])rows[index].cells[0].append(' · Imported summary');});
+}
+
 export function sessionTransport(session) {
   const ms=value=>Math.round(value);
   return {endTime:ms(session.endTime),endReason:session.endReason,
@@ -77,7 +84,7 @@ export async function startAccountStudy(doc=document,host=window,{appDependencie
   const logout=doc.createElement('button');logout.type='button';logout.className='secondary';logout.textContent='End session and sign out';
   top.append(title,status,retry,doc.createTextNode(' '),account,doc.createTextNode(' '),logout);doc.querySelector('main header').after(top);
   const bridge=new AccountStudy(client,user,{notify:message=>{status.textContent=message;retry.hidden=!bridge.failures.size;
-    const saved=doc.getElementById('summary-save-status');if(saved&&message==='Session saved to your account.')saved.textContent=message;},render:records=>renderHistory(doc,records)});
+    const saved=doc.getElementById('summary-save-status');if(saved&&message==='Session saved to your account.')saved.textContent=message;},render:records=>renderAccountHistory(doc,records)});
   await bridge.refresh();const [family,email]=await Promise.all([bridge.api.request('/family-link'),bridge.api.request('/report-config')]);
   // Account-mode copy replaces only obsolete local-storage/privacy statements.
   for(const paragraph of doc.querySelectorAll('p')){
