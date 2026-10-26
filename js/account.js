@@ -1,4 +1,5 @@
 // Keep the bearer token out of URLs, HTML, logs, and persistent localStorage.
+import { bootGoogleSignIn } from "./google-signin.js";
 const TOKEN_KEY = "focuslens.auth.token.v1";
 
 export class AccountClient {
@@ -33,10 +34,14 @@ export class AccountClient {
     const abort = new AbortController(); this.abort = abort;
     const timeout = setTimeout(() => abort.abort(), 20000);
     try {
-      const response = await this.fetcher(`/auth/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields), signal: abort.signal, credentials: "omit" });
+      const response = await this.fetcher(`/auth/${kind}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields), signal: abort.signal, credentials: kind === "google" ? "same-origin" : "omit" });
       const data = await response.json();
       if (generation !== this.generation) return null;
-      if (!response.ok) throw new Error(data.error || "Account access could not be completed.");
+      if (!response.ok) {
+        const failure = new Error(data.error || "Account access could not be completed.");
+        failure.code = data.code;
+        throw failure;
+      }
       if (typeof data.token !== "string" || !data.user) throw new Error("Invalid account response.");
       this.save(data.token);
       return data.user;
@@ -47,13 +52,21 @@ export class AccountClient {
 export function bootAccount(doc = document, client = new AccountClient()) {
   const get = (id) => doc.getElementById(id);
   let busy = false;
+  let googleSignIn;
   function status(message) { get("account-status").textContent = message; }
   function error(message) { get("account-error").textContent = message || ""; get("account-error").hidden = !message; }
   function signedIn(user) {
+    if (user) googleSignIn?.cancel();
     get("auth-forms").hidden = Boolean(user); get("signed-in").hidden = !user;
     for (const [id, value] of [["current-name", user?.displayName], ["current-email", user?.email], ["current-role", user?.role]]) get(id).textContent = value || "";
     status(user ? client.storageAvailable ? "Signed in on this browser tab." : "Signed in for this page. Browser storage is unavailable." : "Ready when you are.");
   }
+  function setBusy(value) {
+    busy = value;
+    get("auth-forms").querySelectorAll("input,select,button").forEach((input) => { input.disabled = value; });
+    get("google-option").setAttribute("aria-busy", String(value));
+  }
+  googleSignIn = bootGoogleSignIn(doc, client, { onUser: signedIn, setBusy, isBusy: () => busy, onError: error, onStatus: status });
   function choose(kind) {
     if (busy) return;
     for (const mode of ["login", "signup"]) {
@@ -69,8 +82,8 @@ export function bootAccount(doc = document, client = new AccountClient()) {
       if (busy || !event.currentTarget.reportValidity()) return;
       const fields = { email: get(`${kind}-email`).value, password: get(`${kind}-password`).value };
       if (kind === "signup") Object.assign(fields, { displayName: get("signup-name").value, role: get("signup-role").value });
-      busy = true; error(null); status(kind === "signup" ? "Creating your account…" : "Signing in…");
-      get("auth-forms").querySelectorAll("input,select,button").forEach((input) => { input.disabled = true; });
+      googleSignIn.cancel();
+      setBusy(true); error(null); status(kind === "signup" ? "Creating your account…" : "Signing in…");
       try {
         const user = await client.authenticate(kind, fields);
         if (user) { get("login-form").reset(); get("signup-form").reset(); signedIn(user); }
@@ -78,21 +91,20 @@ export function bootAccount(doc = document, client = new AccountClient()) {
         error(failure.name === "AbortError" ? "The request timed out. Please try again." : failure.message); status("Your study data has not been changed.");
       } finally {
         get(`${kind}-password`).value = "";
-        busy = false;
-        get("auth-forms").querySelectorAll("input,select,button").forEach((input) => { input.disabled = false; });
+        setBusy(false);
+        if (!get("auth-forms").hidden) void googleSignIn.start();
       }
     });
   }
-  get("sign-out").addEventListener("click", () => { client.logout(); signedIn(null); error(null); });
+  get("sign-out").addEventListener("click", () => { client.logout(); googleSignIn.cancel(); signedIn(null); error(null); void googleSignIn.start(); });
   const ready = (async () => {
-    if (!client.token) return;
-    busy = true; status("Checking your sign-in…");
-    get("auth-forms").querySelectorAll("input,select,button").forEach((input) => { input.disabled = true; });
+    if (!client.token) return googleSignIn.start();
+    setBusy(true); status("Checking your sign-in…");
     try { signedIn(await client.restore()); }
     catch (failure) { signedIn(null); error(failure.name === "AbortError" ? "Could not check your sign-in. Please try again." : failure.message); }
     finally {
-      busy = false;
-      get("auth-forms").querySelectorAll("input,select,button").forEach((input) => { input.disabled = false; });
+      setBusy(false);
+      if (!get("auth-forms").hidden) await googleSignIn.start();
     }
   })();
   return { client, ready };

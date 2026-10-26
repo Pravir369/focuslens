@@ -13,10 +13,25 @@
   <p class="eyebrow">FocusLens · Accounts</p>
   <h1>A place for your progress.</h1>
   <p class="intro">Create an account or sign in. Your account is saved on this service.</p>
-  <p class="notice">Account preview. Study sessions still run in the original app; account-backed history and Google sign-in are the next steps. Your existing browser history stays intact.</p>
+  <p class="notice">Account preview. Study sessions still run in the original app; account-backed study history is coming next. Your existing browser history stays intact.</p>
   <p id="account-status" role="status" aria-live="polite">Ready when you are.</p>
   <p id="account-error" role="alert" hidden></p>
   <section id="auth-forms" class="card" aria-label="Account access">
+    <div id="google-option" class="google-option" aria-busy="false">
+      <label for="google-role">For a new Google account, I’m a</label>
+      <select id="google-role"><option value="student">Student</option><option value="parent">Parent</option></select>
+      <div id="google-button" aria-label="Google sign-in"></div>
+      <p id="google-status" class="muted" role="status">Loading Google sign-in…</p>
+      <button id="google-retry" type="button" hidden>Retry Google sign-in</button>
+      <form id="google-link-form" hidden>
+        <p>To link an existing account, enter its FocusLens password. This is not your Google password.</p>
+        <label for="google-link-password">Existing FocusLens password</label>
+        <input id="google-link-password" type="password" autocomplete="current-password" required>
+        <button type="submit">Link account and sign in</button>
+        <button id="google-link-cancel" type="button">Cancel linking</button>
+      </form>
+    </div>
+    <p class="auth-divider">or use your email</p>
     <div class="tabs"><button id="choose-login" type="button" aria-pressed="true">Sign in</button><button id="choose-signup" type="button" aria-pressed="false">Create account</button></div>
     <form id="login-form">
       <h2>Welcome back.</h2>

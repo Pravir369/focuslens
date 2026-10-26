@@ -31,6 +31,7 @@ def create_app(test_config=None):
         PRODUCTION=production, PUBLIC_ORIGIN=origin, TRUST_PROXY=env.get("TRUST_PROXY") == "1",
         TRUSTED_HOSTS=[urlsplit(origin).hostname] if production else ["localhost", "127.0.0.1"],
         MAX_CONTENT_LENGTH=16384, AUTH_RATE_LIMIT=20, AUTH_RATE_WINDOW=60,
+        GOOGLE_CLIENT_ID=env.get("GOOGLE_CLIENT_ID", ""), GOOGLE_NONCE_SECONDS=600,
     )
     if test_config: app.config.update(test_config)
     if len(app.config["JWT_SECRET_KEY"].encode()) < 32:
@@ -50,6 +51,8 @@ def create_app(test_config=None):
     migrate.init_app(app, db, directory=str(ROOT / "migrations"))
     from .auth import register_auth
     register_auth(app)
+    from .google_auth import google_auth
+    app.register_blueprint(google_auth)
 
     @app.before_request
     def transport_and_origin():
@@ -65,8 +68,9 @@ def create_app(test_config=None):
     def security_headers(response):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin" if app.config["PRODUCTION"] else "no-referrer-when-downgrade"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         if app.config["PRODUCTION"]: response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
 
@@ -83,7 +87,7 @@ def create_app(test_config=None):
 
     @app.get("/health")
     def health():
-        return jsonify(app="FocusLens Accounts", phase=2, checkpoint="jwt-middleware")
+        return jsonify(app="FocusLens Accounts", phase=2, checkpoint="google-auth")
 
     @app.get("/")
     @app.get("/account.html")
@@ -92,7 +96,7 @@ def create_app(test_config=None):
 
     @app.get("/assets/<path:name>")
     def account_assets(name):
-        allowed = {"account.js": ROOT / "js", "account.css": ROOT, "icon-192.png": ROOT}
+        allowed = {"account.js": ROOT / "js", "google-signin.js": ROOT / "js", "account.css": ROOT, "icon-192.png": ROOT}
         if name not in allowed: return jsonify(error="Not found."), 404
         return send_from_directory(allowed[name], name)
 
