@@ -7,6 +7,10 @@ export function loadGoogleIdentity(doc = document, win = window) {
   identityLoading = new Promise((resolve, reject) => {
     const script = doc.createElement("script");
     script.src = "https://accounts.google.com/gsi/client"; script.async = true;
+    // GIS copies currentScript.nonce onto its injected button stylesheet.
+    // Authorize that style only; keep inline scripts/styles blocked otherwise.
+    const styleNonce = doc.querySelector?.('meta[name="focuslens-google-style-nonce"]')?.content;
+    if (styleNonce) script.nonce = styleNonce;
     const fail = () => {
       clearTimeout(timeout); script.remove(); identityLoading = null;
       reject(new Error("Google sign-in could not load. Check your connection and retry."));

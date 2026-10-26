@@ -13,7 +13,7 @@ import threading
 import time
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask import Blueprint, current_app, g, jsonify, request, render_template_string
 from google.auth.exceptions import GoogleAuthError, TransportError
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
@@ -97,7 +97,7 @@ def start():
 
 
 @api.get('')
-def page(): return send_from_directory(ROOT, 'google-companion.html')
+def page(): return render_template_string((ROOT/'google-companion.html').read_text(), google_style_nonce=g.google_style_nonce)
 
 
 @api.get('/config')

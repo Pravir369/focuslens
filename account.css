@@ -27,7 +27,7 @@ td, th { border-bottom: 1px solid #d7e2d9; padding: 10px; text-align: left; }
 details { margin-top: 24px; } summary { cursor: pointer; font-weight: 600; }
 .google-option label { margin-top: 0; }
 .google-option select { margin-bottom: 18px; }
-#google-button { min-height: 44px; }
+#google-button { min-height: 44px; max-width: 300px; }
 .google-option[aria-busy="true"] #google-button { pointer-events: none; opacity: .6; }
 .auth-divider { display: flex; gap: 16px; align-items: center; color: #52645b; font-size: .85rem; margin: 24px 0; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #d7e2d9; }

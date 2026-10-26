@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { AccountClient } from "../js/account.js";
-import { bootGoogleSignIn, googleConfig } from "../js/google-signin.js";
+import { bootGoogleSignIn, googleConfig, loadGoogleIdentity } from "../js/google-signin.js";
 
 const memory = () => {
   const map = new Map();
@@ -47,6 +47,14 @@ test("Google config uses same-origin cookies and rejects missing configuration",
   assert.equal(options.credentials,"same-origin"); assert.equal(config.nonce,"test-nonce");
   await assert.rejects(googleConfig(async () => response({error:"Not configured"},503)),/Not configured/);
   await assert.rejects(googleConfig(async () => response({clientId:"wrong",nonce:""})),/could not be verified/);
+});
+
+test("Google loader passes the server's style nonce to GIS without enabling arbitrary inline styles", async () => {
+  const identity={initialize(){}},win={};let loaded;
+  const doc={querySelector:selector=>selector==='meta[name="focuslens-google-style-nonce"]'?{content:'test-response-style-nonce'}:null,
+    createElement:()=>({remove(){}}),head:{append(script){loaded=script;win.google={accounts:{id:identity}};script.onload();}}};
+  assert.equal(await loadGoogleIdentity(doc,win),identity);
+  assert.equal(loaded.src,'https://accounts.google.com/gsi/client');assert.equal(loaded.nonce,'test-response-style-nonce');
 });
 
 const settle = () => new Promise(resolve=>setImmediate(resolve));

@@ -2,6 +2,7 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import re
 import tempfile
 import time
 import unittest
@@ -134,6 +135,18 @@ class GoogleCompanionTests(unittest.TestCase):
         def exchange(_): return self.app.test_client().post(PREFIX+'/finish',json=self.proof).status_code
         with ThreadPoolExecutor(max_workers=2) as pool: statuses=list(pool.map(exchange,range(2)))
         self.assertEqual(sorted(statuses),[200,410])
+
+    def test_google_styles_use_fresh_response_nonce_without_relaxing_inline_policy(self):
+        nonces=[]
+        for path in ['/', '/account.html', PREFIX]:
+            response=self.browser.get(path)
+            self.assertEqual(response.status_code,200)
+            nonce=re.search(r'name="focuslens-google-style-nonce" content="([A-Za-z0-9_-]+)"',response.text).group(1)
+            nonces.append(nonce);self.assertGreaterEqual(len(nonce),32)
+            csp=response.headers['Content-Security-Policy']
+            self.assertIn("'nonce-"+nonce+"'",csp);self.assertNotIn('unsafe-inline',csp)
+            self.assertNotIn('nonce-',csp.split('script-src ')[1].split(';')[0])
+        self.assertEqual(len(set(nonces)),3)
 
 
 if __name__ == '__main__': unittest.main()

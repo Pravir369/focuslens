@@ -2,10 +2,11 @@
 from pathlib import Path
 from io import BytesIO
 import logging
+import secrets
 import zipfile
 from urllib.parse import urlsplit
 
-from flask import Flask, jsonify, request, send_from_directory, send_file
+from flask import Flask, g, jsonify, request, render_template_string, send_from_directory, send_file
 from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -74,6 +75,8 @@ def create_app(test_config=None):
 
     @app.before_request
     def transport_and_origin():
+        if request.endpoint in ('account_page', 'google_companion.page'):
+            g.google_style_nonce = secrets.token_urlsafe(24)
         # Preserve the small auth-body limit; history import is bounded separately.
         if request.path in ("/auth/login","/auth/signup","/auth/google") and (request.content_length or 0)>16384:
             data=request.get_json(silent=True) if request.is_json else None
@@ -93,6 +96,10 @@ def create_app(test_config=None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin" if app.config["PRODUCTION"] else "no-referrer-when-downgrade"
         response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        if getattr(g, 'google_style_nonce', None):
+            response.headers['Content-Security-Policy'] = response.headers['Content-Security-Policy'].replace(
+                "style-src 'self' https://accounts.google.com/gsi/style;",
+                f"style-src 'self' https://accounts.google.com/gsi/style 'nonce-{g.google_style_nonce}';")
         if request.path=="/study" or request.path.startswith("/js/") or request.path=="/tests/account-study-browser.html":
             response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/; style-src 'self'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/ https://storage.googleapis.com/mediapipe-models/; worker-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; manifest-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
@@ -123,7 +130,7 @@ def create_app(test_config=None):
     @app.get("/")
     @app.get("/account.html")
     def account_page():
-        return send_from_directory(ROOT, "account.html")
+        return render_template_string((ROOT/'account.html').read_text(), google_style_nonce=g.google_style_nonce)
 
     @app.get("/assets/<path:name>")
     def account_assets(name):
