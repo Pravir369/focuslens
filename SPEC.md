@@ -61,7 +61,7 @@ At any moment, the user is in exactly one of four states, derived every frame fr
 - **`engaged`** — head pose falls within the calibrated "screen zone" or "notes zone" (see Section 5), with fresh phone-absent evidence required in phone-free mode.
 - **`distracted`** — face is detected, but head pose falls outside both calibrated zones, or a fresh phone detection overrides the zone in phone-free mode.
 - **`drowsy`** — face is detected, eyes have been closed (via blendshape score) continuously for >1 second.
-- **`away`** — no face detected, with fresh Camera A person-absent evidence in the presence-enabled path described in Section 5.2.2. The legacy face-only path uses missing landmarks alone. This is treated as a legitimate break, NOT as distraction. Do not count it against engagement %, do not fire nudges during it.
+- **`away`** — no face detected at all (MediaPipe returns no landmarks for the frame). This is treated as a legitimate break, NOT as distraction. Do not count it against engagement %, do not fire nudges during it.
 
 **Critical: do not act on raw per-frame state.** Raw MediaPipe output is noisy (a single blink, a quick glance while writing, momentary tracking loss). All state transitions must go through the debounce/hysteresis logic in Section 5 before anything in the UI or event log reacts.
 
@@ -117,16 +117,6 @@ Choose a policy before calibration and lock it while the camera/test/session is 
 Precedence: no face → `away`; unusable face readings → unknown; closed eyes → `eyes_closed`; successful calibration required; then in phone-free mode evaluate phone evidence before head pose. Missing/stale phone results mean unknown, not phone absence. Unknown resets pending dwell. Fresh phone absence plus an engaged head pose is required to return to `engaged`. Apply the existing 3-second distraction debounce exactly once, with no extra phone dwell. Changing the cause of raw `distracted` from phone to head pose (or vice versa) does not reset the candidate. Preserve all four states and the existing event format; show the raw reading reason separately in diagnostics.
 
 Show phone detection status, confidence, result age, and correctly aligned boxes on the mirrored preview, with readable labels. Distinguish library download, runtime/WASM initialization, face-model download, phone-model download, and worker/inference errors. Offer retry; never silently bypass phone-free detection. Hide/stall invalidation clears phone evidence and rejects late results from before the interruption.
-
-### 5.2.2 Looking away versus leaving the chair
-
-The user reported that turning their head caused face landmarks to disappear and incorrectly became `away`. In Phone-free mode, the existing EfficientDet worker now reads both `person` and `cell phone` from the same inference. Camera B never establishes student presence. No extra worker, camera image storage, or camera uploads are added.
-
-When face landmarks are missing in this presence-enabled path, require calibration, then inspect Camera A's fresh person result: present → raw `distracted`; absent → raw `away`; missing/stale → unknown. Apply the existing three-second distraction and one-second away dwell exactly once. A transition from an off-zone face pose to missing landmarks with person presence remains one continuous distracted candidate. A detected face keeps the existing pose/eyes/phone precedence. Event fields, metrics, recovery exclusions and audio rules remain unchanged.
-
-Person confidence starts at 0.45 and freshness at 750ms, with separate named constants. Phone confidence remains 0.55. Diagnostics show person presence, confidence and result age. Include the head and upper body in Camera A's view and manually verify head turns and leaving the view; a model-loading check is not a camera-accuracy check. Person detection is a presence estimate, not identity or gaze recognition; another visible person can affect it.
-
-Studying with phone remains on the existing face-only path for now. Enabling the object model there requires the user's pending confirmation because the earlier policy explicitly excluded that dependency.
 
 ### 5.3 Hysteresis / debounce (this is what makes the detector correct, not noisy — do not skip this)
 

@@ -72,7 +72,7 @@
       const click = (id) => get(id).click();
       const text = (id) => get(id).textContent;
       const view = (name) => !doc.querySelector(`[data-view="${name}"]`).hidden;
-      let time = 0, hidden = false, callbacks, tick, phone, phonePresent = false, phoneStale = false, personPresent = true;
+      let time = 0, hidden = false, callbacks, tick, phone, phonePresent = false, phoneStale = false;
       let desk, deskPresent = false, deskStalled = false, deskDenied = false;
       let windowOffTask = false, windowSignal;
       let stoppedStreams = 0, closedModels = 0, createdPhones = 0;
@@ -120,7 +120,7 @@
           phone = {
             ready: false, latest: null, deskLatest: null, options,
             async start() { this.ready = true; },
-            async sample(video, capturedAt) { if (this.ready && !phoneStale) this.latest = { capturedAt, present: phonePresent, confidence: phonePresent ? 0.8 : null, boxes: [], person: { capturedAt, present: personPresent, confidence: personPresent ? .8 : null, boxes: [] } }; },
+            async sample(video, capturedAt) { if (this.ready && !phoneStale) this.latest = { capturedAt, present: phonePresent, confidence: phonePresent ? 0.8 : null, boxes: [] }; },
             async sampleNext(video, deskFrame, now) { void this.sample(video, now); if (deskFrame) this.deskLatest = { capturedAt: deskFrame.capturedAt, present: deskPresent, confidence: deskPresent ? 0.85 : null, boxes: [] }; },
             invalidateSource(source) { if (source === "cameraB") this.deskLatest = null; else this.latest = null; },
             invalidate() { this.latest = this.deskLatest = null; }, stop() { this.ready = false; this.latest = this.deskLatest = null; },
@@ -133,9 +133,8 @@
       function feed(duration, pose = "screen") {
         for (let elapsed = 0; elapsed < duration; elapsed += 100) {
           time += Math.min(100, duration - elapsed);
-          personPresent = pose !== 'away';
           const data = {
-            faceDetected: !['away','profile'].includes(pose), pose: ['away','profile'].includes(pose) ? null : { yaw: pose === "side" ? 40 : 0, pitch: pose === "notes" ? 30 : 0, roll: 0 },
+            faceDetected: pose !== "away", pose: pose === "away" ? null : { yaw: pose === "side" ? 40 : 0, pitch: pose === "notes" ? 30 : 0, roll: 0 },
             eyeClosedScore: pose === "closed" ? 0.9 : 0.1, eyeBlinkLeft: 0.1, eyeBlinkRight: 0.1,
           };
           callbacks?.onFrame(data, time); tick?.();
@@ -317,15 +316,6 @@
       check(text("summary-pattern").includes("app outside your study list"), "Window-only session needs its own pattern tip");
       previews.summary = doc.querySelector('[data-view="summary"]').outerHTML;
       document.getElementById("preview-window").disabled = false;
-      click('change-policy'); get('phone-policy').value = 'phone-free';
-      click('begin'); await until(() => view('calibration'), 'Presence session did not reach calibration');
-      await calibrate(); get('window-enabled').checked = false; await start(); feed(1200);
-      feed(2000, 'profile'); check(text('state-indicator') === 'Engaged', 'Brief face turn must retain the existing 3-second distraction dwell');
-      feed(1200, 'profile'); check(text('state-indicator') === 'Distracted', 'A seated person without face landmarks must be Distracted rather than Away');
-      check(text('person-status').includes('Person detected'), 'Person diagnostics must show Camera A presence');
-      feed(1200, 'away'); check(text('state-indicator') === 'Away', 'An empty chair must still become Away');
-      feed(1200); check(text('state-indicator') === 'Engaged', 'Fresh face/phone readings must restore engagement after one second');
-      click('end-session');
       instance.dispose();
       instance = boot(async () => ({}), { document: doc, createProfile, createPacingStore, createHistoryStore: () => new HistoryStore(() => { throw new Error("Storage blocked for test"); }), setInterval: () => 0, clearInterval() {} });
       check(view("start") && !get("begin").disabled && get("save-history").disabled, "Unavailable storage must not block starting a session");
