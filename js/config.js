@@ -16,6 +16,11 @@ export const CALIBRATION_STEPS = Object.freeze([
 ]);
 // Longer gaps are unobserved time, never continuous evidence for a transition.
 export const MAX_FRAME_GAP_MS = 500;
+// Leave CPU time for the phone worker instead of running face inference at
+// the display's 60–120 Hz refresh rate. Dwell still uses elapsed milliseconds.
+export const FACE_SAMPLE_INTERVAL_MS = 1000 / 15;
+export const CAMERA_WIDTH = 640;
+export const CAMERA_HEIGHT = 480;
 export const MEDIAPIPE_VERSION = "0.10.32";
 export const MEDIAPIPE_MODULE_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/vision_bundle.mjs`;
 export const MEDIAPIPE_WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;

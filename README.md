@@ -158,6 +158,10 @@ To verify without using a camera, open **http://localhost:8000/tests/summary-bro
 
 ## Phone and classification rules
 
+Face processing is capped at 15 frames/second to leave processing time for the phone worker. Camera A requests 640×480 at 15 fps (up to 30); phone transfers are bounded to 640×480 without cropping, even if a camera supplies HD. Phone sampling keeps its separate combined four-per-second limit. The worker warms up with a disposable synthetic image before it reports ready; no warm-up result becomes camera evidence. The existing 750 ms freshness limit, confirmation times, face/eye precedence and four states are unchanged.
+
+Before calibration or Start Session, diagnostics explain that classification has not started. In a live session, the waiting line shows the current missing reading or confirmation progress. Sustained unusable readings include retry guidance; they never fabricate engagement or silently disable phone detection. If a real-camera session still stays waiting, record its reading reason, candidate dwell, face frame rate and phone result age. Browser model tests use synthetic pixels and controlled face readings, so they do not establish real-camera accuracy.
+
 - **Phone-free:** a fresh phone detection overrides either study zone. A visible unused phone also counts. Phone-caused or pose-caused raw distraction must persist continuously for 3 seconds before confirmation; there is no second phone debounce.
 - **Studying with phone:** phone evidence is ignored; no phone model or worker is created.
 - No face → raw away; unusable face data → unknown; closed eyes → eyes_closed; then evaluate phone policy and head pose. Drowsy/away/engaged require their existing 1-second dwell. Unknown resets pending dwell.

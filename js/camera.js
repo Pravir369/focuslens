@@ -1,8 +1,13 @@
+import { CAMERA_WIDTH, CAMERA_HEIGHT } from "./config.js";
+
 export async function startCamera(video, onEnded) {
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     throw new Error("Camera access requires localhost or HTTPS. Open http://localhost:8000, using the local server instructions.");
   }
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: CAMERA_WIDTH }, height: { ideal: CAMERA_HEIGHT }, frameRate: { ideal: 15, max: 30 } },
+    audio: false,
+  });
   try {
     video.srcObject = stream;
     await video.play();

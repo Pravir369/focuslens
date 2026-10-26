@@ -18,6 +18,7 @@ import { PacingStore } from "./pacing.js";
 import { ReportController } from "./reports.js";
 import { WindowSignal } from "./window-signal.js";
 import { classifyWithWindow } from "./window-fusion.js";
+import { classificationFeedback } from "./classification-feedback.js";
 
 // Optional dependencies let the browser integration fixture exercise this exact
 // interface with a controlled clock and detector, without camera permissions.
@@ -75,6 +76,8 @@ export function boot(loadVision, overrides = {}) {
   let sessionActionPending = false;
   let finalized = false;
   let latestRaw = null;
+  let latestReason = "Waiting for fresh camera readings";
+  let waitingSince = null;
   let lastFrameAt = null;
   let gapActive = false;
   let gapCount = 0;
@@ -304,6 +307,8 @@ export function boot(loadVision, overrides = {}) {
     phoneTracker?.invalidate();
     desk.resetFrames(); deskUsable = false;
     latestRaw = null;
+    latestReason = "Waiting for fresh camera readings";
+    waitingSince = deps.now();
     nudges.reset();
     audio.cancel();
     ui["nudge-banner"].hidden = true;
@@ -354,7 +359,9 @@ export function boot(loadVision, overrides = {}) {
     set("state-indicator", paused ? "Paused" : confirmed ? confirmed[0].toUpperCase() + confirmed.slice(1) : "Waiting for classification");
     const metrics = sessionMetrics(session, at());
     set("engaged-percent", metrics.engagedPct === null ? "Waiting for classified time" : `${metrics.engagedPct.toFixed(1)}% engaged · ${session.goalEngagementPct}% goal`);
-    set("live-reading", paused ? "Timer, scoring, and nudges are paused." : latestRaw === null ? "Waiting for usable readings. Unclassified time is excluded from engagement." : "");
+    set("live-reading", classificationFeedback({ running: session.state === "running", paused,
+      calibrated: Boolean(calibration.result), confirmed, raw: latestRaw, reason: latestReason,
+      progress: machine.candidateProgress(deps.now()), waitingMs: deps.now() - (waitingSince ?? deps.now()) }));
     const source = !paused && session.events.at(-1)?.end === null ? session.events.at(-1)?.triggerSource : null;
     set("live-source", source ? `Distraction confirmed from ${source === "window" ? "the active app" : source === "cameraB" ? "Camera B (desk camera)" : "Camera A"}.` : "");
     updateDeskControls();
@@ -378,6 +385,14 @@ export function boot(loadVision, overrides = {}) {
     ui["nudge-banner"].hidden = paused || latestRaw === null || !nudges.bannerVisible;
     if (ui.diagnostics.open && at() - lastLogAt > 1000) { renderLog(); lastLogAt = at(); }
   }
+  function samplePhoneFrame(now) {
+    if (!tracking) return;
+    let deskFrame = null;
+    try { deskFrame = desk.frame(now); } catch { /* Optional feed must not stop face tracking. */ }
+    if (!deskFrame && deskUsable) phoneTracker?.invalidateSource("cameraB");
+    deskUsable = Boolean(deskFrame);
+    void phoneTracker?.sampleNext(ui.video, deskFrame, now);
+  }
   function onFrame(frame, now) {
     if (!tracking) return;
     gapActive = false;
@@ -387,11 +402,8 @@ export function boot(loadVision, overrides = {}) {
       set("face-fps", (frameCount * 1000 / (now - frameWindowStart)).toFixed(1));
       frameWindowStart = now; frameCount = 0;
     }
-    let deskFrame = null;
-    try { deskFrame = desk.frame(now); } catch { /* Optional feed must not stop face tracking. */ }
-    if (!deskFrame && deskUsable) phoneTracker?.invalidateSource("cameraB");
-    deskUsable = Boolean(deskFrame);
-    void phoneTracker?.sampleNext(ui.video, deskFrame, now);
+    // Also covers tracking adapters which only provide processed face frames.
+    samplePhoneFrame(now);
     if (!tracking) return;
     renderPhone(now);
     renderDeskPhone(now);
@@ -413,6 +425,9 @@ export function boot(loadVision, overrides = {}) {
       phonePolicy: activePhonePolicy, phoneSample: phoneTracker?.latest, deskPhoneSample: deskUsable ? phoneTracker?.deskLatest : null, now,
     }, windows.offTask());
     latestRaw = observation.state;
+    latestReason = observation.reason;
+    if (latestRaw === null) waitingSince ??= now;
+    else if (machine.currentConfirmedState) waitingSince = null;
     set("raw", latestRaw ?? "Unclassified"); set("reason", observation.reason);
     set("live-reason", observation.reason);
     if (session?.state === "running") {
@@ -425,7 +440,8 @@ export function boot(loadVision, overrides = {}) {
     const progress = machine.candidateProgress(now);
     set("candidate", progress?.state ?? "—");
     set("dwell", progress ? `${formatDuration(progress.elapsedMs)} / ${formatDuration(progress.requiredMs)}` : "—");
-    set("confirmed", machine.currentConfirmedState ?? "Waiting for classification");
+    set("confirmed", machine.currentConfirmedState ?? (session?.state === "running" ? "Waiting for classification"
+      : classificationFeedback({ running: false, paused: session?.state === "paused", calibrated: Boolean(calibration.result), calibrating: calibration.active })));
     renderLive();
   }
   function disconnectPipeline({ resetCalibration = false } = {}) {
@@ -487,7 +503,7 @@ export function boot(loadVision, overrides = {}) {
       landmarker = nextLandmarker;
       tracking = true;
       stopLoop = deps.startTracking(ui.video, landmarker, {
-        onFrame, onGap: handleGap,
+        onFrame, onVideoFrame: samplePhoneFrame, onGap: handleGap,
         onError(error) { if (token === operation) pipelineFault("Face tracking stopped. Retry tracking, then resume.", error); },
       });
       if (activePhonePolicy === "phone-free") {

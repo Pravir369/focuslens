@@ -1,10 +1,22 @@
-import { PHONE_SAMPLE_INTERVAL_MS, PHONE_LOAD_TIMEOUT_MS } from "./config.js";
+import { PHONE_SAMPLE_INTERVAL_MS, PHONE_LOAD_TIMEOUT_MS, CAMERA_WIDTH, CAMERA_HEIGHT } from "./config.js";
 import { SetupError } from "./loading.js";
+
+export function createPhoneBitmap(video, createBitmap = (...args) => createImageBitmap(...args)) {
+  const width = video.videoWidth || video.width;
+  const height = video.videoHeight || video.height;
+  const scale = Math.min(1, CAMERA_WIDTH / width, CAMERA_HEIGHT / height);
+  // Camera constraints are preferences; some devices still supply HD/4K.
+  // Bound the transferred image, keeping the full frame and its aspect ratio.
+  return scale < 1 ? createBitmap(video, {
+    resizeWidth: Math.max(1, Math.round(width * scale)),
+    resizeHeight: Math.max(1, Math.round(height * scale)), resizeQuality: "low",
+  }) : createBitmap(video);
+}
 
 export class PhoneTracker {
   constructor({ onError = () => {}, onStage = () => {}, onSourceError = () => {},
     workerFactory = () => new Worker(new URL("./phone-worker.js", import.meta.url), { type: "module" }),
-    makeBitmap = (video) => createImageBitmap(video),
+    makeBitmap = (video) => createPhoneBitmap(video),
     // Keep Window timer functions bound to their native receiver in WebKit.
     setTimer = (callback, delay) => setTimeout(callback, delay),
     clearTimer = (timer) => clearTimeout(timer),

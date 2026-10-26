@@ -1,4 +1,4 @@
-import { MEDIAPIPE_MODULE_URL } from "./config.js";
+import { MEDIAPIPE_MODULE_URL, CAMERA_WIDTH, CAMERA_HEIGHT } from "./config.js";
 import { atStage } from "./loading.js";
 import { createPhoneDetector } from "./phone-model.js";
 import { readPhoneResult } from "./phone.js";
@@ -15,6 +15,16 @@ self.onmessage = async ({ data }) => {
       detector = await createPhoneDetector(vision, {
         canvas: new OffscreenCanvas(1, 1),
         onStage: (stage) => self.postMessage({ type: "stage", stage }),
+      });
+      // WASM's first inference can take longer than the evidence freshness
+      // window. Warm it with synthetic pixels before advertising readiness;
+      // this is never camera evidence and never enters the classifier.
+      await atStage("runtime", async () => {
+        const canvas = new OffscreenCanvas(CAMERA_WIDTH, CAMERA_HEIGHT);
+        canvas.getContext("2d").fillRect(0, 0, canvas.width, canvas.height);
+        const warmup = await createImageBitmap(canvas);
+        try { detector.detectForVideo(warmup, 0); }
+        finally { warmup.close(); }
       });
       self.postMessage({ type: "ready" });
     } catch (error) {

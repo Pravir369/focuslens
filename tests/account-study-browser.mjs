@@ -2,11 +2,14 @@ import { AccountClient } from '/js/account.js';
 import { startAccountStudy } from '/js/study-entry.js';
 import { sessionMetrics } from '/js/session.js';
 import { MEDIAPIPE_MODULE_URL } from '/js/config.js';
-import { createLandmarker } from '/js/tracking.js';
+import { createLandmarker, startTracking } from '/js/tracking.js';
+import { PhoneTracker } from '/js/phone-tracker.js';
+import { phoneEvidence } from '/js/phone.js';
+import { StateMachine, classifyFrame } from '/js/classifier.js';
 const get=id=>document.getElementById(id), wait=()=>new Promise(resolve=>setTimeout(resolve,10));
 async function until(fn,message){for(let i=0;i<400;i++){if(fn())return;await wait();}throw new Error(message);}
 get('models').addEventListener('click',async()=>{
-  get('models').disabled=true;get('model-result').textContent='Loading the real face model and phone worker…';let face,worker;
+  get('models').disabled=true;get('model-result').textContent='Loading the real face model and phone worker…';let face,worker,tracker;
   try{
     const canvas=document.createElement('canvas');canvas.width=canvas.height=64;canvas.getContext('2d').fillRect(0,0,64,64);
     face=await createLandmarker(await import(MEDIAPIPE_MODULE_URL));const result=face.detectForVideo(canvas,1);
@@ -15,8 +18,30 @@ get('models').addEventListener('click',async()=>{
     await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Phone worker timed out')),60000);worker.onerror=()=>{clearTimeout(timer);reject(new Error('Phone worker failed'));};worker.onmessage=event=>{if(event.data.type==='ready'){clearTimeout(timer);resolve();}if(event.data.type==='error'){clearTimeout(timer);reject(new Error('Phone worker: '+event.data.message));}};worker.postMessage({type:'init'});});
     const bitmap=await createImageBitmap(canvas);
     await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Phone inference timed out')),10000);worker.onmessage=event=>{if(event.data.type==='result'){clearTimeout(timer);if(event.data.sample.present)reject(new Error('Blank canvas unexpectedly contained a phone'));else resolve();}if(event.data.type==='error'){clearTimeout(timer);reject(new Error(event.data.message));}};worker.postMessage({type:'frame',id:'synthetic-check',generation:0,source:'cameraA',capturedAt:1,inferenceAt:1,bitmap},[bitmap]);});
-    get('model-result').textContent='PASS · Actual face model and phone worker loaded and processed a blank synthetic canvas under the study CSP. No camera used.';
-  }catch(error){get('model-result').textContent='FAIL · '+error.message;}finally{face?.close();worker?.terminate();get('models').disabled=false;}
+    worker.terminate(); worker=null;
+    tracker=new PhoneTracker();await tracker.start();
+    canvas.width=640;canvas.height=480;canvas.getContext('2d').fillRect(0,0,640,480);
+    const machine=new StateMachine(), zone={yaw:0,pitch:0,yawTolerance:15,pitchTolerance:12};
+    const reading={faceDetected:true,pose:{yaw:0,pitch:0,roll:0},eyeClosedScore:.1};
+    let frames=0,unknown=0,maxAge=0,maxGap=0,lastAt=null;
+    // A canvas supplies synthetic pixels; only the video clock is simulated.
+    // Exercise the production scheduler and real model inference together.
+    canvas.readyState=2;Object.defineProperty(canvas,'currentTime',{get:()=>performance.now()/1000});
+    get('model-result').textContent='Models loaded. Checking eight seconds of face + phone processing…';
+    await new Promise((resolve,reject)=>{
+      const started=performance.now();
+      const stop=startTracking(canvas,face,{onVideoFrame(now){void tracker.sampleNext(canvas,null,now);},onFrame(result,now){try{
+        if(lastAt!==null)maxGap=Math.max(maxGap,now-lastAt);lastAt=now;
+        const evidence=phoneEvidence(tracker.latest,now);if(evidence.ageMs!==null)maxAge=Math.max(maxAge,evidence.ageMs);
+        const raw=classifyFrame(reading,{screen:zone,notes:zone},{phonePolicy:'phone-free',phoneSample:tracker.latest,now});
+        if(raw===null)unknown++;machine.update(raw,now);frames++;
+        if(now-started>=8000){stop();resolve();}
+      }catch(error){stop();reject(error);}},onGap(info){stop();reject(new Error(`Processing gap: ${info.reason}`));},onError(error){stop();reject(error);}});
+    });
+    const timing=`${frames} face frames; ${unknown} waiting frames; max phone age ${maxAge.toFixed(0)}ms; max frame gap ${maxGap.toFixed(0)}ms`;
+    if(machine.currentConfirmedState!=='engaged')throw new Error(`Sustained processing never confirmed synthetic engagement: ${timing}`);
+    get('model-result').textContent=`PASS · Actual models ran together and confirmed engagement from controlled face readings. ${timing}. Blank synthetic canvas only; no camera used.`;
+  }catch(error){get('model-result').textContent='FAIL · '+error.message;}finally{face?.close();worker?.terminate();tracker?.stop();get('models').disabled=false;}
 });
 get('run').addEventListener('click',async()=>{
   get('run').disabled=true;get('result').textContent='Signing into an isolated synthetic test account…';let integration;
@@ -27,14 +52,14 @@ get('run').addEventListener('click',async()=>{
     if(!prefs.ok)throw new Error('Synthetic account preferences could not be saved');
     const source=new DOMParser().parseFromString(await fetch('/study').then(response=>response.text()),'text/html');
     document.querySelector('main')?.remove();document.body.append(source.querySelector('main'));
-    let time=0,callbacks,tick;const epoch=Date.now();let stopped=0;
+    let time=0,callbacks,tick;const epoch=Date.now();let stopped=0,phonePresent=false;
     integration=await startAccountStudy(document,window,{loadVision:async()=>({}),appDependencies:{
       now:()=>time,epochAt:now=>epoch+now,setInterval:fn=>{tick=fn;return 1;},clearInterval(){},
       startCamera:async()=>({getTracks:()=>[{stop(){stopped++;}}],getVideoTracks:()=>[{getSettings:()=>({deviceId:'synthetic'})}]}),
       stopCamera:(video,stream)=>stream?.getTracks().forEach(track=>track.stop()),createLandmarker:async()=>({close(){}}),
       startTracking(video,model,handlers){callbacks=handlers;return()=>{callbacks=null;};},listDeskCameras:async()=>[],
       createAudioCues:()=>({unlock:async()=>true,play:()=>true,cancel(){},close:async()=>{}}),
-      createPhoneTracker:()=>({ready:false,latest:null,async start(){this.ready=true;},async sampleNext(video,desk,now){this.latest={capturedAt:now,present:false,confidence:null,boxes:[]};},invalidateSource(){this.latest=null;},invalidate(){this.latest=null;},stop(){this.ready=false;this.latest=null;}})
+      createPhoneTracker:()=>({ready:false,latest:null,async start(){this.ready=true;},async sampleNext(video,desk,now){this.latest={capturedAt:now,present:phonePresent,confidence:phonePresent ? .9 : null,boxes:[]};},invalidateSource(){this.latest=null;},invalidate(){this.latest=null;},stop(){this.ready=false;this.latest=null;}})
     }});
     if(get('session-length').value!=='custom'||get('custom-length').value!=='35'||get('engagement-goal').value!=='75')throw new Error('Saved session defaults were not applied');
     const feed=(duration,pose='screen')=>{for(let elapsed=0;elapsed<duration;elapsed+=100){time+=100;callbacks?.onFrame({faceDetected:true,pose:{yaw:pose==='side'?40:0,pitch:pose==='notes'?30:0,roll:0},eyeClosedScore:.1,eyeBlinkLeft:.1,eyeBlinkRight:.1},time);tick?.();}};
@@ -43,7 +68,10 @@ get('run').addEventListener('click',async()=>{
     if(document.querySelector('[data-view="setup"]').hidden)throw new Error('Calibration did not reach Setup');
     feed(300);get('session-length').value='15';get('session-length').dispatchEvent(new Event('change'));get('setup-form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
     await until(()=>!document.querySelector('[data-view="live"]').hidden,'Session did not start');
-    feed(2200);feed(6200,'side');feed(2400);get('pause-session').click();time+=2000;
+    feed(2200);if(get('state-indicator').textContent!=='Engaged')throw new Error('Session stayed waiting instead of confirming engagement');
+    phonePresent=true;feed(3500);if(get('state-indicator').textContent!=='Distracted')throw new Error('Visible phone in a study zone did not confirm distraction');
+    phonePresent=false;feed(1400);if(get('state-indicator').textContent!=='Engaged')throw new Error('Removing the phone did not restore engagement');
+    feed(6200,'side');feed(2400);get('pause-session').click();time+=2000;
     // Resume requires a fresh controlled camera frame after the pause.
     feed(200);get('resume-session').click();await until(()=>get('resume-session').hidden,'Resume did not finish');feed(1600);
     get('end-session').click();await integration.bridge.flush();

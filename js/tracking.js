@@ -1,4 +1,4 @@
-import { FACE_MODEL_URL, MEDIAPIPE_WASM_URL, MAX_FRAME_GAP_MS } from "./config.js";
+import { FACE_MODEL_URL, MEDIAPIPE_WASM_URL, MAX_FRAME_GAP_MS, FACE_SAMPLE_INTERVAL_MS } from "./config.js";
 import { matrixToEulerAngles } from "./pose.js";
 import { atStage, loadModelBuffer } from "./loading.js";
 
@@ -26,22 +26,41 @@ export function readFrame(result) {
   return { faceDetected, pose, eyeClosedScore, eyeBlinkLeft: left ?? null, eyeBlinkRight: right ?? null };
 }
 
-export function startTracking(video, landmarker, { onFrame, onGap, onError }) {
+export function startTracking(video, landmarker, { onFrame, onVideoFrame, onGap, onError }, {
+  now: clock = () => performance.now(),
+  requestFrame = (callback) => requestAnimationFrame(callback),
+  cancelFrame = (id) => cancelAnimationFrame(id),
+  isHidden = () => document.hidden,
+} = {}) {
   let stopped = false;
   let requestId = null;
   let lastVideoTime = -1;
-  let lastProcessedAt = performance.now();
+  let lastSampleVideoTime = -1;
+  let lastProcessedAt = clock();
+  let lastInferenceAt = -Infinity;
   let gapReported = false;
 
   function tick(now) {
     if (stopped) return;
     try {
-      if (document.hidden) {
+      if (isHidden()) {
         if (!gapReported) onGap({ reason: "hidden", lastFrameAt: lastProcessedAt });
         gapReported = true;
       } else if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+        if (video.currentTime !== lastSampleVideoTime) {
+          lastSampleVideoTime = video.currentTime;
+          onVideoFrame?.(now);
+          if (stopped) return;
+        }
+        // Skipping a display tick is intentional throttling, not a missing
+        // camera observation. Only consume video.currentTime when we infer.
+        if (now - lastInferenceAt < FACE_SAMPLE_INTERVAL_MS) {
+          requestId = requestFrame(tick);
+          return;
+        }
         if (now - lastProcessedAt > MAX_FRAME_GAP_MS && !gapReported) onGap({ reason: "frames-stalled", lastFrameAt: lastProcessedAt });
         lastVideoTime = video.currentTime;
+        lastInferenceAt = now;
         const result = landmarker.detectForVideo(video, now);
         lastProcessedAt = now;
         gapReported = false;
@@ -50,15 +69,15 @@ export function startTracking(video, landmarker, { onFrame, onGap, onError }) {
         onGap({ reason: "frames-stalled", lastFrameAt: lastProcessedAt });
         gapReported = true;
       }
-      requestId = requestAnimationFrame(tick);
+      requestId = requestFrame(tick);
     } catch (error) {
       stopped = true;
       onError(error);
     }
   }
-  requestId = requestAnimationFrame(tick);
+  requestId = requestFrame(tick);
   return () => {
     stopped = true;
-    cancelAnimationFrame(requestId);
+    cancelFrame(requestId);
   };
 }
