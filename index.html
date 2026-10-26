@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FocusLens · Study session</title>
+  <meta name="theme-color" content="#28664e">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" type="image/png" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="stylesheet" href="./styles.css?v=7.4">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">FocusLens</p>
+      <h1>A little support for your next study session.</h1>
+    </header>
+    <p id="error" class="error" role="alert" hidden></p>
+    <p id="status" class="muted" role="status">Ready when you are.</p>
+    <div id="workflow" class="workflow">
+      <div>
+        <section class="card" data-view="start" aria-labelledby="start-title">
+          <h2 id="start-title" tabindex="-1">Make room to focus.</h2>
+          <p>Calibrate your study positions, choose a session, and receive gentle reminders when a distraction lasts.</p>
+          <p><strong>Your camera footage and images never leave this device. Nothing from your camera is uploaded.</strong></p>
+          <p class="muted">The tracking library and models download over the network. All camera processing happens in your browser. Camera images are never saved. Optional history keeps summary statistics in this browser on this device.</p>
+          <p class="muted">A random local profile ID groups your data; it is not a login. First-distraction timing is saved locally for pacing suggestions, separately from optional summary history.</p>
+          <p class="muted">If you choose Send Report after a session, its summary and text timeline are emailed through your configured sending account. Camera footage is never included.</p>
+          <p id="profile-status" class="muted" role="status"></p>
+          <label for="phone-policy">Phone policy</label>
+          <select id="phone-policy">
+            <option value="phone-free" selected>Phone-free</option>
+            <option value="phone-allowed">Studying with phone</option>
+          </select>
+          <p class="muted">Phone-free counts a visible phone as distraction after 3 seconds, including an unused phone beside your notes. Studying with phone ignores phone detection. Phones outside camera view cannot be detected.</p>
+          <label class="check-label"><input id="save-history" type="checkbox">Save future session summaries on this device</label>
+          <p class="muted">History is off by default. No footage, head-pose readings, calibration, or event timelines are stored. Clear saved summaries anytime in History.</p>
+          <p id="history-start-status" class="muted" role="status"></p>
+          <div class="actions"><button id="begin" type="button">Begin</button><button id="open-history" type="button" class="secondary">History</button></div>
+        </section>
+
+        <section class="card" data-view="calibration" aria-labelledby="calibration-title" hidden>
+          <h2 id="calibration-title" tabindex="-1">Find your study positions.</h2>
+          <p>Keep this tab visible. Follow three prompts: screen (5s), notes (5s), then a side glance (3s).</p>
+          <p id="calibration-instruction" class="instruction" role="status">Get your screen and notes ready.</p>
+          <p id="calibration-countdown" class="countdown">—</p>
+          <p id="calibration-quality" class="muted">Each step needs at least 90% valid face readings.</p>
+          <p id="calibration-error" class="error" role="alert" hidden></p>
+          <div class="actions">
+            <button id="calibrate" type="button" disabled>Start calibration</button>
+            <button id="cancel-calibration" type="button" class="secondary">Back / change policy</button>
+          </div>
+        </section>
+
+        <section class="card" data-view="setup" aria-labelledby="setup-title" hidden>
+          <h2 id="setup-title" tabindex="-1">Choose your session.</h2>
+          <p id="setup-policy" class="muted"></p>
+          <form id="setup-form">
+            <div class="setup-fields"><div class="setup-field">
+            <p class="eyebrow">01 · Make some time</p>
+            <label for="session-length">Session length</label>
+            <select id="session-length">
+              <option value="15">15 minutes</option>
+              <option value="25" selected>25 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="custom">Custom</option>
+            </select>
+            <p id="pacing-suggestion" class="muted" hidden></p>
+            <div id="custom-length-field" hidden>
+              <label for="custom-length">Minutes</label>
+              <input id="custom-length" type="number" min="1" step="1" value="1" disabled>
+            </div>
+            <p class="muted">Choose a short block or give yourself time to settle in. You can pause or end whenever you need.</p>
+            </div><div class="setup-field">
+            <p class="eyebrow">02 · Set an intention</p>
+            <label for="engagement-goal">Target engagement (%)</label>
+            <input id="engagement-goal" type="number" min="0" max="100" step="1" value="80" required>
+            <label for="goal-range" class="muted">Adjust your target</label>
+            <input id="goal-range" type="range" min="0" max="100" step="1" value="80" aria-describedby="goal-help">
+            <p id="goal-help" class="muted">A personal target, not a grade. Away, paused, and unclassified time are excluded.</p>
+            </div></div>
+            <p id="setup-plan" class="session-plan" aria-live="polite">25 minutes · 80% engagement target</p>
+            <fieldset id="desk-settings" class="desk-settings">
+              <legend>Optional desk camera · Camera B</legend>
+              <p class="muted">Connect a second USB webcam and aim it at your desk or lap. Camera A keeps tracking your face. Both views use the same phone detector.</p>
+              <label for="desk-device">Desk camera</label>
+              <select id="desk-device"><option value="">No desk camera · use Camera A only</option></select>
+              <div class="actions"><button id="connect-desk" type="button" class="secondary" disabled>Connect desk camera</button><button id="refresh-devices" type="button" class="secondary">Refresh camera list</button></div>
+              <p id="desk-status" class="muted" role="status">Desk camera is optional. Camera A works on its own.</p>
+              <p class="muted">A visible unused phone counts in phone-free mode. Missing or stale desk-camera readings are ignored; this does not prove the desk is phone-free. Wi-Fi phone-camera support is deferred until USB camera testing passes.</p>
+            </fieldset>
+            <fieldset class="desk-settings">
+              <legend>Optional app monitoring · macOS</legend>
+              <label class="check-label"><input id="window-enabled" type="checkbox">Use my study-app list this session</label>
+              <label for="allowed-apps">Allowed app names, separated by commas</label>
+              <textarea id="allowed-apps" rows="2" maxlength="1600" placeholder="Google Chrome, Notion, Preview"></textarea>
+              <p class="muted">Reads the frontmost app name only. It never captures screen content, screenshots, browser tabs, or window titles. Enter actual app names; “Chrome” also matches “Google Chrome”. Apps outside your list count as off-task; an empty list allows no apps.</p>
+              <p class="muted">Common distractions include YouTube, Instagram, TikTok, Discord, Steam, and games. An allowed browser can still contain distracting tabs; this version cannot distinguish them. Keep FocusLens visible: hiding it still pauses the session.</p>
+            </fieldset>
+            <p class="muted">Engagement is an estimate from your study positions and phone policy. Keep FocusLens visible while you study; hiding this tab automatically pauses the session.</p>
+            <div class="actions">
+              <button id="start-session" type="submit">Start Session</button>
+              <button id="redo-calibration" type="button" class="secondary">Recalibrate</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card" data-view="live" aria-labelledby="live-title" hidden>
+          <h2 id="live-title" tabindex="-1">Your study session</h2>
+          <p class="muted">Time remaining</p>
+          <p id="countdown" class="session-countdown" aria-label="Time remaining">25:00</p>
+          <p id="state-indicator" class="state-indicator" data-state="waiting" role="status">Waiting for classification</p>
+          <p><strong id="engaged-percent">Waiting for classified time</strong></p>
+          <p class="muted">Engagement excludes away, paused, and unclassified time.</p>
+          <p id="live-reading" class="muted"></p>
+          <p id="live-reason" class="muted"></p>
+          <p id="live-source" class="muted"></p>
+          <p id="window-live-status" class="muted" role="status">App monitoring is off.</p>
+          <div id="pause-notice" class="notice" hidden>
+            <p id="pause-reason" role="status"></p>
+            <p id="resume-readiness" class="muted"></p>
+            <button id="reconnect" type="button" class="secondary" hidden>Reconnect camera / retry tracking</button>
+          </div>
+          <div id="nudge-banner" class="notice" role="status" hidden>
+            <p>Still here? Tap to resume focus.</p>
+            <button id="dismiss-nudge" type="button" class="secondary">Dismiss reminder</button>
+          </div>
+          <div class="actions">
+            <button id="pause-session" type="button">Pause</button>
+            <button id="resume-session" type="button" hidden>Resume</button>
+            <button id="end-session" type="button" class="secondary">End Session early</button>
+          </div>
+          <p id="audio-status" class="muted" role="status"></p>
+          <button id="enable-audio" type="button" class="secondary" hidden>Enable sound</button>
+        </section>
+
+        <section class="card" data-view="summary" aria-labelledby="summary-title" hidden>
+          <h2 id="summary-title" tabindex="-1">Your session, at a glance.</h2>
+          <p id="summary-meta" class="muted"></p>
+          <p id="summary-recovery" class="recovery-stat"></p>
+          <p id="summary-recoveries" class="muted"></p>
+          <p id="summary-phone-sources" class="muted"></p>
+          <p id="summary-window-sources" class="muted"></p>
+          <div class="summary-stats">
+            <div><p id="summary-engagement" class="stat-sentence"></p><p id="summary-goal"></p></div>
+            <div><p id="summary-distractions" class="stat-sentence"></p></div>
+            <div><p id="summary-longest" class="stat-sentence"></p></div>
+          </div>
+          <p id="summary-pattern" class="pattern-tip"></p>
+          <h3>Session timeline</h3>
+          <div id="timeline" class="timeline" role="img" aria-label="Session timeline"></div>
+          <p id="timeline-empty" class="muted" hidden>No elapsed time to display.</p>
+          <ul class="legend" aria-label="Timeline colors">
+            <li><span data-state="engaged"></span>Engaged</li><li><span data-state="distracted"></span>Distracted</li>
+            <li><span data-state="distracted" class="phone-catch"></span>Phone-related distraction</li>
+            <li><span data-state="distracted" class="window-catch"></span>Off-task app</li>
+            <li><span data-state="drowsy"></span>Drowsy</li><li><span data-state="away"></span>Away</li>
+            <li><span data-state="paused"></span>Paused</li><li><span data-state="unclassified"></span>Unclassified</li>
+          </ul>
+          <p class="muted">Only uninterrupted distracted → engaged transitions count as recoveries. Away, pauses, missing readings, and the end of a session do not count as recovery. Unclassified time is excluded from the statistics above.</p>
+          <details><summary>Timeline details</summary><div class="table-scroll"><table>
+            <thead><tr><th>State</th><th>Start</th><th>End</th><th>Duration</th></tr></thead><tbody id="timeline-rows"></tbody>
+          </table></div></details>
+          <p id="summary-save-status" class="muted" role="status"></p>
+          <form id="report-form" class="report-form">
+            <h3>Email this session report</h3>
+            <p class="muted">Optional for this session only. Sends these stats, the pattern tip, and a text timeline. Addresses are used for this send only; they are not saved as a subscription.</p>
+            <label for="report-email">Your email</label><input id="report-email" type="email" autocomplete="off" required>
+            <label for="report-email-extra">Second email (optional)</label><input id="report-email-extra" type="email" autocomplete="off">
+            <button id="send-report" type="submit" class="secondary" disabled>Send Report</button>
+            <p id="report-status" class="muted" role="status"></p>
+          </form>
+          <div class="actions"><button id="new-session" type="button">New Session</button><button id="summary-history" type="button" class="secondary">View history</button><button id="change-policy" type="button" class="secondary">Change phone policy</button></div>
+        </section>
+
+        <section class="card" data-view="history" aria-labelledby="history-title" hidden>
+          <p class="eyebrow">A little perspective</p>
+          <h2 id="history-title" tabindex="-1">Returning to focus, over time.</h2>
+          <p id="history-count" class="muted"></p>
+          <p id="history-trend" class="history-headline"></p>
+          <svg id="history-chart" viewBox="0 0 640 220" role="img" aria-label="Recovery speed across saved sessions" hidden></svg>
+          <p id="history-trend-note" class="muted"></p>
+          <div class="table-scroll"><table>
+            <caption>Saved session summaries · oldest first</caption>
+            <thead><tr><th>Ended</th><th>Study time</th><th>Average recovery (count)</th><th>Engagement / goal</th><th>Distractions</th><th>Phone policy</th></tr></thead>
+            <tbody id="history-rows"></tbody>
+          </table></div>
+          <div class="history-settings">
+            <label class="check-label"><input id="history-enabled" type="checkbox">Save future session summaries on this device</label>
+            <p class="muted">Turning this off keeps existing history. Clear history deletes all saved summaries and turns saving off. Only summaries are stored, never camera images, calibration, or event timelines. History belongs to this browser and site address; clearing browser data also removes it.</p>
+            <p id="history-storage-status" class="muted" role="status"></p>
+            <button id="clear-history" type="button" class="secondary">Clear history</button>
+            <p class="muted">Pacing suggestions use a separate local timing history for this profile.</p>
+            <button id="clear-pacing" type="button" class="secondary">Clear pacing history</button>
+            <p id="pacing-clear-status" class="muted" role="status"></p>
+          </div>
+          <div class="actions"><button id="history-back" type="button">Back</button></div>
+        </section>
+      </div>
+
+      <aside id="camera-panel" class="card" aria-labelledby="preview-title" hidden>
+        <h2 id="preview-title">Camera A · Face and phone</h2>
+        <div class="preview">
+          <video id="video" autoplay muted playsinline aria-label="Mirrored camera preview"></video>
+          <canvas id="phone-overlay" width="640" height="480" aria-hidden="true"></canvas>
+        </div>
+        <p class="muted">Mirrored preview. Camera images stay on this device.</p>
+        <button id="stop-camera" type="button" class="secondary">Stop camera</button>
+        <section id="desk-preview-panel" aria-labelledby="desk-preview-title" hidden>
+          <h3 id="desk-preview-title">Camera B · Desk phone detection</h3>
+          <div class="preview desk-preview"><video id="desk-video" autoplay muted playsinline aria-label="Unmirrored desk camera preview"></video><canvas id="desk-overlay" width="640" height="480" aria-hidden="true"></canvas></div>
+          <p id="desk-live-status" class="muted" role="status"></p>
+          <p class="muted">Desk preview is not mirrored. Pause to retry a disconnected desk camera.</p>
+          <div class="actions"><button id="desk-retry" type="button" class="secondary" hidden>Retry desk camera</button><button id="stop-desk" type="button" class="secondary">Use Camera A only</button></div>
+        </section>
+      </aside>
+    </div>
+
+    <details id="diagnostics" class="card" hidden>
+      <summary>Detector diagnostics</summary>
+      <dl class="readings">
+        <div><dt>Face</dt><dd id="face">—</dd></div><div><dt>Yaw</dt><dd id="yaw">—</dd></div>
+        <div><dt>Pitch</dt><dd id="pitch">—</dd></div><div><dt>Roll</dt><dd id="roll">—</dd></div>
+        <div><dt>Left / right eye closure</dt><dd id="eyes">—</dd></div><div><dt>Average eye closure</dt><dd id="eye-average">—</dd></div>
+        <div><dt>Phone detector</dt><dd id="phone-status">Not started</dd></div><div><dt>Phone confidence</dt><dd id="phone-confidence">—</dd></div>
+        <div><dt>Phone result age</dt><dd id="phone-age">—</dd></div><div><dt>Face frames / second</dt><dd id="face-fps">—</dd></div>
+        <div><dt>Desk phone detector</dt><dd id="desk-phone-status">Off</dd></div><div><dt>Desk phone confidence</dt><dd id="desk-phone-confidence">—</dd></div>
+        <div><dt>Desk result age</dt><dd id="desk-phone-age">—</dd></div>
+        <div><dt>Processing interruptions</dt><dd id="gap-count">0</dd></div><div><dt>Raw frame</dt><dd id="raw">—</dd></div>
+        <div><dt>Current reading reason</dt><dd id="reason">—</dd></div><div><dt>Candidate</dt><dd id="candidate">—</dd></div>
+        <div><dt>Candidate dwell</dt><dd id="dwell">—</dd></div><div><dt>Confirmed state</dt><dd id="confirmed">Waiting for classification</dd></div>
+      </dl>
+      <p class="muted">Study zones: ±<span id="yaw-tolerance"></span>° yaw / ±<span id="pitch-tolerance"></span>° pitch. Eye closure &gt; <span id="eye-threshold"></span>. Phone confidence ≥ <span id="phone-threshold"></span>; freshness ≤ <span id="phone-freshness"></span>ms.</p>
+      <h3>Calibration readings</h3><div class="table-scroll"><table><thead><tr><th>Position</th><th>Yaw</th><th>Pitch</th><th>Valid frames</th></tr></thead><tbody id="calibration-rows"></tbody></table></div>
+      <h3>Confirmed event log</h3><div class="table-scroll"><table><thead><tr><th>State</th><th>Start</th><th>End</th><th>Duration</th></tr></thead><tbody id="event-rows"></tbody></table></div>
+      <details><summary>Session records (JSON)</summary><pre id="event-json">[]</pre></details>
+    </details>
+    <footer>Distraction is normal. A fresh start is always available.</footer>
+  </main>
+  <noscript><p>FocusLens requires JavaScript to process your camera on this device.</p></noscript>
+  <script type="module">
+    import { boot } from "./js/app.js?v=7.4";
+    import { MEDIAPIPE_MODULE_URL } from "./js/config.js";
+    boot(() => import(MEDIAPIPE_MODULE_URL));
+  </script>
+</body>
+</html>

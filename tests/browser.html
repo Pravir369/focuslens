@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FocusLens · Tracker loading check</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <main>
+    <h1>Tracker loading check</h1>
+    <p>This checks the real CDN library, WASM runtimes, hosted face/phone models, and empty-frame inference, including the module worker. It does not use a camera or verify detection accuracy.</p>
+    <button id="run" type="button">Run loading check</button>
+    <pre id="result" role="status">Ready.</pre>
+    <p><a href="../">Return to detector test</a></p>
+    <canvas id="source" width="640" height="480" style="width:160px;height:120px" aria-label="Locally generated blank test image"></canvas>
+    <video id="source-video" autoplay muted playsinline style="width:160px;height:120px" aria-label="Locally generated blank test video"></video>
+    <video id="desk-source-video" autoplay muted playsinline style="width:160px;height:120px" aria-label="Second locally generated blank test video"></video>
+  </main>
+  <script type="module">
+    import { MEDIAPIPE_MODULE_URL } from "../js/config.js";
+    import { createLandmarker, readFrame } from "../js/tracking.js";
+    import { classifyFrame } from "../js/classifier.js";
+    import { PhoneTracker } from "../js/phone-tracker.js";
+    const button = document.getElementById("run");
+    const output = document.getElementById("result");
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      let landmarker;
+      let phone;
+      let phoneError;
+      let stream;
+      let paintTimer;
+      let playbackTimer;
+      const video = document.getElementById("source-video");
+      const deskVideo = document.getElementById("desk-source-video");
+      try {
+        output.textContent = "Downloading CDN module, WASM runtime, and model…";
+        const vision = await import(MEDIAPIPE_MODULE_URL);
+        landmarker = await createLandmarker(vision);
+        const canvas = document.getElementById("source");
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#777";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        const frame = readFrame(landmarker.detectForVideo(canvas, performance.now()));
+        if (classifyFrame(frame, null) !== "away") throw new Error("Empty image was not classified as away.");
+        output.textContent = "PASS: face model loaded; empty-frame inference returned away.\nLoading phone model in module worker…";
+        phone = new PhoneTracker({ onError(error) { phoneError = error; } });
+        await phone.start();
+        // Exercise the same HTMLVideoElement → ImageBitmap → worker path as
+        // the real camera, using a locally synthesized video with no people.
+        stream = canvas.captureStream(10);
+        video.srcObject = stream;
+        deskVideo.srcObject = stream;
+        paintTimer = setInterval(() => {
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          stream.getVideoTracks()[0]?.requestFrame?.();
+        }, 100);
+        output.textContent = "PASS: face and phone models loaded.\nPreparing locally generated test video…";
+        await Promise.race([
+          Promise.all([video.play(), deskVideo.play()]),
+          new Promise((resolve, reject) => { playbackTimer = setTimeout(() => reject(new Error("Generated video did not start in this browser")), 8000); }),
+        ]);
+        clearTimeout(playbackTimer);
+        for (let index = 0; index < 4; index++) {
+          const now = performance.now();
+          if (!await phone.sampleNext(video, { video: deskVideo, capturedAt: now - 50 }, now)) throw new Error("Shared detector did not accept the next sample");
+          const deadline = performance.now() + 10000;
+          while (phone.inFlight && !phone.stopped && performance.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+          if (phoneError) throw phoneError;
+          if (phone.inFlight) throw new Error("Shared worker inference timed out");
+          // Face inference continues between A/B object detections.
+          if (classifyFrame(readFrame(landmarker.detectForVideo(canvas, performance.now())), null) !== "away") throw new Error("Face inference failed while sharing phone detection");
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        if (phoneError) throw phoneError;
+        if (!phone.latest) throw new Error("Phone worker did not return an inference result");
+        if (phone.latest.present) throw new Error("Empty image was incorrectly detected as a phone");
+        if (!phone.deskLatest || phone.deskLatest.present) throw new Error("Second feed did not return a no-phone result");
+        output.textContent = "PASS: CDN module, face/phone models, and WASM runtimes loaded.\nPASS: Face inference continued between object detections.\nPASS: Two HTML video feeds → transferred bitmaps → one shared module-worker phone model, alternating A/B/A/B, returned no phone.\nReal USB-camera accuracy and performance testing is still required. No camera was accessed.";
+      } catch (error) {
+        output.textContent = `FAIL: ${error.message}\n${error.stack ?? ""}`;
+      } finally {
+        landmarker?.close();
+        phone?.stop();
+        clearInterval(paintTimer);
+        clearTimeout(playbackTimer);
+        stream?.getTracks().forEach((track) => track.stop());
+        video.pause();
+        video.srcObject = null;
+        deskVideo.pause(); deskVideo.srcObject = null;
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

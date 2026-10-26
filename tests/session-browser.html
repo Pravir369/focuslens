@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FocusLens · Session interface checks</title><link rel="icon" href="data:,"><link rel="stylesheet" href="../styles.css?v=7.4">
+</head>
+<body><main>
+  <h1>Session interface checks</h1>
+  <p>Uses the production interface with a controlled clock and synthetic detector readings. No camera, network model, or session audio is used by this test.</p>
+  <div class="actions"><button id="run" type="button">Run session checks</button><button id="audio" class="secondary" type="button">Check quiet synthesized audio</button><button id="preview-history" class="secondary" type="button" disabled>Preview synthetic history</button><button id="preview-setup" class="secondary" type="button" disabled>Preview session setup</button><button id="preview-desk" class="secondary" type="button" disabled>Preview desk detection</button><button id="preview-window" class="secondary" type="button" disabled>Preview app summary</button><button id="preview-narrow" class="secondary" type="button">Narrow preview</button><a href="../">Open FocusLens</a></div>
+  <pre id="result" role="status">Ready.</pre><p id="audio-result" role="status"></p>
+  <iframe id="app" title="Production FocusLens interface with synthetic test input" style="width:100%;height:1450px;border:1px solid #bdc8b9;border-radius:6px"></iframe>
+</main>
+<script type="module">
+  import { boot } from "../js/app.js?v=7.4";
+  import { AudioCues } from "../js/audio.js";
+  import { HistoryStore } from "../js/history.js?v=7";
+  import { renderHistory } from "../js/history-view.js";
+  import { LocalProfile } from "../js/profile.js";
+  import { PacingStore } from "../js/pacing.js";
+  import { ReportController } from "../js/reports.js";
+  const run = document.getElementById("run");
+  const result = document.getElementById("result");
+  const frame = document.getElementById("app");
+  let instance;
+  let previews;
+  function preview(name) {
+    if (!previews) return;
+    const doc = frame.contentDocument;
+    doc.querySelectorAll("[data-view]").forEach((view) => { view.hidden = true; });
+    const section = doc.querySelector(`[data-view="${name}"]`);
+    section.outerHTML = previews[name];
+    doc.querySelector(`[data-view="${name}"]`).hidden = false;
+    if (name === "history") doc.getElementById("history-enabled").checked = true;
+    doc.getElementById("status").textContent = "Synthetic interface preview. No camera data was used; preview controls are inactive.";
+  }
+  document.getElementById("preview-history").addEventListener("click", () => preview("history"));
+  document.getElementById("preview-setup").addEventListener("click", () => preview("setup"));
+  document.getElementById("preview-desk").addEventListener("click", () => preview("live"));
+  document.getElementById("preview-window").addEventListener("click", () => preview("summary"));
+  document.getElementById("preview-narrow").addEventListener("click", () => { frame.style.maxWidth = frame.style.maxWidth ? "" : "375px"; });
+  const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+  async function until(predicate, message) {
+    for (let i = 0; i < 100; i++) { if (predicate()) return; await wait(10); }
+    throw new Error(message);
+  }
+  run.addEventListener("click", async () => {
+    run.disabled = true;
+    let doc;
+    let summaryMarkup;
+    let setupMarkup;
+    let passed = 0;
+    const testKey = `focuslens.test.${crypto.randomUUID()}`;
+    const testStorage = { getItem: () => localStorage.getItem(testKey), setItem: (key, value) => localStorage.setItem(testKey, value), removeItem: () => localStorage.removeItem(testKey) };
+    const auxiliary = new Map();
+    const auxiliaryStorage = { getItem: (key) => auxiliary.get(key) ?? null, setItem: (key, value) => auxiliary.set(key, value) };
+    const createProfile = () => new LocalProfile(() => auxiliaryStorage);
+    const createPacingStore = (profileId) => new PacingStore(profileId, () => auxiliaryStorage);
+    const createHistoryStore = (profileId = createProfile().getId()) => new HistoryStore(() => testStorage, profileId);
+    const check = (condition, message) => { if (!condition) throw new Error(message); passed++; };
+    try {
+      instance?.dispose();
+      result.textContent = "Loading production interface…";
+      const html = new DOMParser().parseFromString(await fetch("../index.html").then((response) => response.text()), "text/html");
+      html.querySelectorAll("script").forEach((script) => script.remove());
+      const base = html.createElement("base"); base.href = new URL("../", location.href).href; html.head.prepend(base);
+      const loaded = new Promise((resolve) => { frame.onload = resolve; });
+      frame.srcdoc = html.documentElement.outerHTML;
+      await loaded;
+      doc = frame.contentDocument;
+      const get = (id) => doc.getElementById(id);
+      const click = (id) => get(id).click();
+      const text = (id) => get(id).textContent;
+      const view = (name) => !doc.querySelector(`[data-view="${name}"]`).hidden;
+      let time = 0, hidden = false, callbacks, tick, phone, phonePresent = false, phoneStale = false;
+      let desk, deskPresent = false, deskStalled = false, deskDenied = false;
+      let windowOffTask = false, windowSignal;
+      let stoppedStreams = 0, closedModels = 0, createdPhones = 0;
+      const stages = [];
+      const sentReports = [];
+      Object.defineProperty(doc, "hidden", { configurable: true, get: () => hidden });
+      const testDeps = {
+        document: doc, now: () => time, epochAt: (value) => Date.UTC(2026, 9, 20, 9) + value,
+        createHistoryStore,
+        createProfile, createPacingStore,
+        createWindowSignal(profileId, options) {
+          windowSignal = { enabled: false, active: false, profileId,
+            reset() { windowOffTask = false; },
+            start(id, config) { this.enabled = config.enabled; this.active = true; this.config = config; this.reset(); },
+            offTask() { return this.enabled && this.active && windowOffTask; },
+            pause() { this.active = false; this.reset(); }, resume() { this.active = true; this.reset(); },
+            stop() { this.active = false; this.reset(); }, dispose() { this.stop(); },
+          }; return windowSignal;
+        },
+        createReportController: (document, profileId) => new ReportController(document, profileId, {
+          fetcher: async (url, options) => {
+            sentReports.push(JSON.parse(options.body)); await wait();
+            return { ok: true, json: async () => ({ profileId, reportId: "synthetic", status: "sent", sentCount: 1 }) };
+          },
+        }),
+        setInterval: (fn) => { tick = fn; return 1; }, clearInterval() {},
+        startCamera: async () => ({ getTracks: () => [{ stop() { stoppedStreams++; } }], getVideoTracks: () => [{ getSettings: () => ({ deviceId: "front" }) }] }),
+        stopCamera: (video, stream) => stream?.getTracks().forEach((track) => track.stop()),
+        createLandmarker: async () => ({ close() { closedModels++; } }),
+        startTracking(video, model, handlers) { callbacks = handlers; return () => { callbacks = null; }; },
+        listDeskCameras: async () => [{ id: "desk", label: "Synthetic USB desk camera" }],
+        createDeskCamera(video, options) {
+          desk = { stream: null,
+            async start(id, primary) {
+              if (id === primary) throw new Error("Must use different cameras");
+              if (deskDenied) { this.fail("Desk camera unavailable: synthetic permission denial. Camera A is still running."); throw new Error("Denied"); }
+              this.stream = {}; options.onStatus("Desk camera connected. Waiting for a fresh frame…"); return true;
+            },
+            frame(now) { return this.stream && !deskStalled ? { video, capturedAt: now } : null; }, resetFrames() {},
+            stop() { this.stream = null; }, fail(message) { this.stop(); options.onStatus(message); options.onUnavailable(); },
+          }; return desk;
+        },
+        createPhoneTracker(options) {
+          createdPhones++;
+          phone = {
+            ready: false, latest: null, deskLatest: null, options,
+            async start() { this.ready = true; },
+            async sample(video, capturedAt) { if (this.ready && !phoneStale) this.latest = { capturedAt, present: phonePresent, confidence: phonePresent ? 0.8 : null, boxes: [] }; },
+            async sampleNext(video, deskFrame, now) { void this.sample(video, now); if (deskFrame) this.deskLatest = { capturedAt: deskFrame.capturedAt, present: deskPresent, confidence: deskPresent ? 0.85 : null, boxes: [] }; },
+            invalidateSource(source) { if (source === "cameraB") this.deskLatest = null; else this.latest = null; },
+            invalidate() { this.latest = this.deskLatest = null; }, stop() { this.ready = false; this.latest = this.deskLatest = null; },
+          };
+          return phone;
+        },
+        createAudioCues: () => ({ async unlock() { return true; }, play(stage) { stages.push(stage); return true; }, cancel() {}, async close() {} }),
+      };
+      instance = boot(async () => ({}), testDeps);
+      function feed(duration, pose = "screen") {
+        for (let elapsed = 0; elapsed < duration; elapsed += 100) {
+          time += Math.min(100, duration - elapsed);
+          const data = {
+            faceDetected: pose !== "away", pose: pose === "away" ? null : { yaw: pose === "side" ? 40 : 0, pitch: pose === "notes" ? 30 : 0, roll: 0 },
+            eyeClosedScore: pose === "closed" ? 0.9 : 0.1, eyeBlinkLeft: 0.1, eyeBlinkRight: 0.1,
+          };
+          callbacks?.onFrame(data, time); tick?.();
+        }
+      }
+      async function calibrate() {
+        click("calibrate"); feed(5100); feed(5100, "notes"); feed(3100, "side");
+        check(view("setup"), "Calibration did not advance to Setup");
+      }
+      async function start(minutes = 2) {
+        feed(300); // Calibration completion deliberately clears phone evidence.
+        get("session-length").value = "custom"; get("session-length").dispatchEvent(new Event("change"));
+        get("custom-length").value = minutes;
+        click("start-session"); await until(() => view("live"), "Session did not start");
+      }
+      async function resume() {
+        feed(300); click("resume-session");
+        await until(() => text("state-indicator") !== "Paused", "Session did not resume"); feed(1200);
+      }
+      check(view("start"), "Initial Start screen missing");
+      check(get("phone-policy").value === "phone-free", "Phone-free default missing");
+      check(!get("save-history").checked && localStorage.getItem(testKey) === null, "History should be off without creating storage");
+      get("save-history").checked = true; get("save-history").dispatchEvent(new Event("change"));
+      click("begin"); await until(() => view("calibration"), "Camera setup did not advance to Calibration");
+      check(get("phone-policy").disabled, "Policy should be locked while camera is active");
+      await calibrate();
+      check(get("session-length").value === "25" && get("engagement-goal").value === "80", "Session defaults incorrect");
+      setupMarkup = doc.querySelector('[data-view="setup"]').outerHTML;
+      get("goal-range").value = "75"; get("goal-range").dispatchEvent(new Event("input"));
+      check(get("engagement-goal").value === "75" && text("setup-plan").includes("75%"), "Goal slider did not update numeric target and preview");
+      get("engagement-goal").value = "80"; get("engagement-goal").dispatchEvent(new Event("input"));
+      check(get("goal-range").value === "80", "Numeric goal did not sync slider");
+      get("session-length").value = "custom"; get("session-length").dispatchEvent(new Event("change")); get("custom-length").value = "0";
+      get("session-length").value = "25"; get("session-length").dispatchEvent(new Event("change"));
+      check(get("custom-length").disabled && get("setup-form").checkValidity(), "Hidden custom value should not block a preset session");
+      await start(); feed(1200);
+      check(text("state-indicator") === "Engaged", "Engaged state missing");
+      phonePresent = true; feed(3500);
+      check(text("state-indicator") === "Distracted", "Phone did not override study zone");
+      feed(15000); check(stages.join(",") === "1", "15-second cue missing or repeated");
+      feed(30000); check(stages.join(",") === "1,2", "45-second cue missing or repeated");
+      check(!get("nudge-banner").hidden, "Stage 2 banner missing");
+      click("dismiss-nudge"); check(get("nudge-banner").hidden && text("state-indicator") === "Distracted", "Dismiss should not force engagement");
+      phonePresent = false; feed(1200); check(text("state-indicator") === "Engaged", "Recovery not confirmed");
+      click("pause-session"); const pausedTime = text("countdown"); time += 5000; tick();
+      check(text("state-indicator") === "Paused" && text("countdown") === pausedTime, "Manual pause did not freeze countdown");
+      await resume();
+      hidden = true; doc.dispatchEvent(new Event("visibilitychange"));
+      check(text("state-indicator") === "Paused", "Hidden tab did not auto-pause");
+      const hiddenTime = text("countdown"); time += 7000; tick();
+      check(text("countdown") === hiddenTime, "Hidden time changed countdown");
+      hidden = false; doc.dispatchEvent(new Event("visibilitychange")); feed(300);
+      check(text("state-indicator") === "Paused", "Showing tab must not auto-resume");
+      await resume();
+      phoneStale = true; feed(1500);
+      check(text("raw") === "Unclassified" && text("live-reading").includes("Unclassified"), "Stale evidence was scored as clean");
+      phoneStale = false; feed(1200);
+      phone.options.onError(new Error("Synthetic phone worker failure"));
+      check(text("state-indicator") === "Paused" && !get("reconnect").hidden, "Tracking failure did not pause and offer retry");
+      click("reconnect"); await until(() => text("status") === "Camera and tracking ready.", "Tracking reconnect failed");
+      check(text("state-indicator") === "Paused", "Reconnect must require manual resume");
+      await resume();
+      feed(1500, "away"); check(text("state-indicator") === "Away", "Away state missing");
+      feed(1500, "closed"); check(text("state-indicator") === "Drowsy", "Drowsy state missing");
+      feed(1200); check(stages.join(",") === "1,2", "Cues leaked across other states");
+      click("end-session");
+      check(view("summary"), "Early end did not show summary");
+      check(text("summary-recoveries").includes("1 confirmed recovery"), "Recovery average crossed a pause or missing-reading gap");
+      check(text("summary-distractions") === "1 moment of distraction this session.", "Distraction count incorrect");
+      check(doc.querySelectorAll('#timeline [data-state="paused"]').length > 0, "Paused timeline segment missing");
+      check(doc.querySelectorAll('#timeline [data-state="unclassified"]').length > 0, "Unclassified timeline segment missing");
+      check(stoppedStreams >= 2 && closedModels >= 2 && !phone.ready, "Camera/model/worker resources were not released");
+      summaryMarkup = doc.querySelector('[data-view="summary"]').outerHTML;
+      check(text("summary-save-status").includes("saved to history"), "Summary save status missing");
+      check(createHistoryStore().data.records[0].profileId === createProfile().getId(), "Saved summary must belong to the same profile as pacing");
+      check(sentReports.length === 0, "Reports must never send automatically");
+      get("report-email").value = "student@example.com"; click("send-report");
+      check(text("report-status") === "Sending…", "Report sending status missing");
+      await until(() => text("report-status").includes("Report sent"), "Report did not finish asynchronously");
+      check(sentReports[0].profileId === createProfile().getId() && sentReports[0].sessionSummary.headlineStats.recovery.includes("46.5 seconds"), "Report must use the shared profile and the visible summary values");
+      check(get("report-email").value === "" && !get("send-report").disabled, "Sent addresses must clear without blocking the summary");
+      click("summary-history");
+      check(view("history") && get("history-rows").children.length === 1 && doc.defaultView.getComputedStyle(get("history-chart")).display !== "none", "Saved history/chart missing or invisible");
+      click("history-back"); check(view("summary"), "History should return to the same summary");
+      click("new-session"); await until(() => view("calibration") && !get("calibrate").disabled, "New session did not require calibration");
+      check(!view("setup"), "Calibration was reused for a new session");
+      await calibrate();
+      check(!get("pacing-suggestion").hidden && get("custom-length").value === "5", "Prior distraction should preselect an editable 5-minute pacing suggestion");
+      check(!get("custom-length").disabled && text("pacing-suggestion").includes("~5 minute"), "Custom pacing suggestion must remain editable");
+      await start(1); feed(61000);
+      check(view("summary") && text("summary-meta").includes("Session complete"), "Automatic timer completion failed");
+      check(text("summary-recovery") === "No distractions this session", "Zero-distraction summary incorrect");
+      click("new-session"); await until(() => view("calibration") && !get("calibrate").disabled, "Second fresh calibration not ready");
+      await calibrate(); await start(1); click("end-session");
+      check(view("summary") && text("summary-engagement").includes("No classified time"), "No-classified-time summary incorrect");
+      click("change-policy"); get("phone-policy").value = "phone-allowed";
+      const previousPhones = createdPhones;
+      click("begin"); await until(() => view("calibration"), "Phone-allowed setup failed");
+      check(createdPhones === previousPhones, "Phone-allowed mode must not create a phone worker");
+      click("cancel-calibration"); check(view("start"), "Cancel did not return to Start");
+      instance.dispose();
+      instance = boot(async () => ({}), { document: doc, createHistoryStore, createProfile, createPacingStore, setInterval: () => 0, clearInterval() {} });
+      check(get("save-history").checked, "Opt-in was not restored after a fresh app boot");
+      click("open-history");
+      check(get("history-rows").children.length === 3, "Summaries were not restored after a fresh app boot");
+      check(text("history-rows").includes("No distractions this session") && text("history-rows").includes("No classified time"), "History null/empty cases incorrect");
+      check(get("history-chart").querySelectorAll("circle").length === 1, "Missing recoveries should not be plotted as zero");
+      const firstRecord = createHistoryStore().data.records[0];
+      const illustrative = [firstRecord,
+        { ...firstRecord, endTime: firstRecord.endTime + 86400000, averageRecoveryMs: null, recoveryCount: 0 },
+        { ...firstRecord, endTime: firstRecord.endTime + 172800000, averageRecoveryMs: 20000 },
+        { ...firstRecord, endTime: firstRecord.endTime + 259200000, averageRecoveryMs: 15000 }];
+      renderHistory(doc, illustrative);
+      check(get("history-chart").querySelectorAll("circle").length === 3 && get("history-chart").querySelectorAll(".chart-line").length === 1, "Chart must leave a gap across a session without recovery");
+      check(text("history-trend").includes("31.5 s faster"), "Trend should compare first and latest qualifying sessions");
+      previews = { history: doc.querySelector('[data-view="history"]').outerHTML, setup: setupMarkup };
+      renderHistory(doc, createHistoryStore().data.records);
+      get("history-enabled").checked = false; get("history-enabled").dispatchEvent(new Event("change"));
+      check(get("history-rows").children.length === 3 && !get("save-history").checked, "Turning history off should preserve records and sync controls");
+      click("clear-history");
+      check(localStorage.getItem(testKey) === null && get("history-chart").hasAttribute("hidden") && text("history-storage-status").includes("cleared"), "Clear history did not remove local data and turn saving off");
+      click("history-back"); check(view("start"), "Start history should return to Start");
+      instance.dispose(); instance = boot(async () => ({}), testDeps);
+      get("phone-policy").value = "phone-free";
+      click("begin"); await until(() => view("calibration"), "Dual-camera calibration not ready");
+      await calibrate();
+      await until(() => get("desk-device").options.length === 2, "Desk device list missing");
+      check(get("desk-device").value === "", "Desk camera must be skippable and off by default");
+      get("desk-device").value = "desk"; get("desk-device").dispatchEvent(new Event("change"));
+      const sharedModels = createdPhones;
+      click("connect-desk"); await until(() => desk.stream && !get("connect-desk").disabled, "Desk camera did not connect");
+      check(createdPhones === sharedModels && !get("desk-preview-panel").hidden, "B must reuse the existing phone detector and show its preview");
+      await start(); feed(1200);
+      deskPresent = true; feed(2000);
+      check(text("state-indicator") === "Engaged", "Brief desk phone appearance must not confirm distraction");
+      deskPresent = false; feed(1200); deskPresent = true; feed(3500);
+      check(text("state-indicator") === "Distracted" && text("live-source").includes("Camera B"), "Desk-only phone did not confirm a labeled distraction");
+      check(JSON.parse(text("event-json")).events.at(-1).triggerSource === "cameraB", "Desk triggerSource missing from event records");
+      check(get("desk-device").disabled, "Desk picker must be locked during a running session");
+      previews.live = doc.querySelector('[data-view="live"]').outerHTML;
+      deskStalled = true; feed(1200);
+      check(text("state-indicator") === "Engaged" && text("desk-phone-status").includes("No fresh"), "Stale B feed must be ignored without pausing A");
+      deskStalled = false; feed(3500);
+      check(text("state-indicator") === "Distracted", "Desk detection did not resume with fresh B readings");
+      desk.fail("Desk camera disconnected (synthetic). Camera A is still running."); feed(1200);
+      check(text("state-indicator") === "Engaged" && !get("desk-retry").hidden, "B unplug must leave A running and offer retry");
+      click("pause-session"); deskDenied = true; click("desk-retry");
+      await until(() => text("desk-live-status").includes("permission denial"), "Desk permission failure not explained");
+      check(text("state-indicator") === "Paused" && !get("resume-session").hidden, "B denial must not break the paused session");
+      deskDenied = false; click("desk-retry"); await until(() => desk.stream, "Desk retry failed");
+      await resume();
+      phone.options.onSourceError(new Error("Synthetic B inference error")); feed(1200);
+      check(text("state-indicator") === "Engaged" && phone.ready, "B inference error must leave A's detector/session running");
+      click("end-session");
+      check(view("summary") && text("summary-phone-sources").includes("Camera B (desk) 2"), "Summary must identify desk-triggered distractions");
+      check(text("timeline-rows").includes("Camera B (desk)"), "Timeline details must identify the desk camera");
+      check(!desk.stream && !phone.ready, "Both camera resources and the shared worker must stop on summary");
+      document.getElementById("preview-desk").disabled = false;
+      click("change-policy"); get("phone-policy").value = "phone-allowed";
+      click("begin"); await until(() => view("calibration"), "App-monitor session did not reach calibration");
+      await calibrate();
+      check(!get("window-enabled").checked, "App monitoring must start off by default");
+      get("window-enabled").checked = true; get("allowed-apps").value = "Notion, Preview";
+      await start(); feed(1200);
+      check(windowSignal.profileId === createProfile().getId() && windowSignal.config.allowedApps.join(",") === "Notion,Preview", "Monitor configuration must use the shared profile and the editable study list");
+      windowOffTask = true; feed(2000);
+      check(text("state-indicator") === "Engaged", "Brief app mismatch must use the existing 3-second debounce");
+      feed(1200);
+      check(text("state-indicator") === "Distracted" && text("live-source").includes("active app"), "Off-task app must work even in studying-with-phone mode");
+      check(JSON.parse(text("event-json")).events.at(-1).triggerSource === "window", "App event must be tagged window");
+      feed(15000); feed(30000);
+      check(stages.join(",") === "1,2,1,2" && !get("nudge-banner").hidden, "Window distractions must use the same 15/45-second nudges");
+      windowOffTask = false; feed(1200);
+      check(text("state-indicator") === "Engaged", "Unavailable/on-task window evidence must allow normal camera recovery");
+      feed(1200, "away"); check(text("state-indicator") === "Away", "No-face precedence must remain unchanged for app monitoring");
+      click("end-session");
+      check(text("summary-window-sources").includes("1 distraction") && text("summary-phone-sources") === "", "Window catches must not be mislabeled as phones");
+      check(doc.querySelectorAll('#timeline .window-catch').length === 1 && doc.querySelectorAll('#timeline .phone-catch').length === 0, "Window timeline marker must remain distinct");
+      check(text("summary-pattern").includes("app outside your study list"), "Window-only session needs its own pattern tip");
+      previews.summary = doc.querySelector('[data-view="summary"]').outerHTML;
+      document.getElementById("preview-window").disabled = false;
+      instance.dispose();
+      instance = boot(async () => ({}), { document: doc, createProfile, createPacingStore, createHistoryStore: () => new HistoryStore(() => { throw new Error("Storage blocked for test"); }), setInterval: () => 0, clearInterval() {} });
+      check(view("start") && !get("begin").disabled && get("save-history").disabled, "Unavailable storage must not block starting a session");
+      click("open-history"); click("clear-history");
+      check(text("history-storage-status").includes("could not be cleared"), "Storage deletion failure should be explained inline");
+      document.getElementById("preview-history").disabled = false;
+      document.getElementById("preview-setup").disabled = false;
+      result.textContent = `PASS: ${passed} interface checks.\nPreserves session/history/desk-camera behavior and verifies profile-aware pacing, editable suggestions, explicit mocked email reports, optional app setup, app-triggered distraction, unchanged reminder timing, and separate app summary/timeline markers.\nPreview below: first synthetic session summary. No camera data was used.\nReal USB-camera, SMTP delivery, macOS app-name permissions, and Finder cold-start checks are still required.`;
+    } catch (error) {
+      result.textContent = `FAIL after ${passed} checks: ${error.message}\n${error.stack ?? ""}`;
+    } finally {
+      instance?.dispose(); instance = null;
+      localStorage.removeItem(testKey);
+      if (doc && summaryMarkup && result.textContent.startsWith("PASS")) {
+        doc.querySelectorAll("[data-view]").forEach((view) => { view.hidden = true; });
+        doc.querySelector('[data-view="summary"]').outerHTML = summaryMarkup;
+        doc.getElementById("status").textContent = "Synthetic test summary. No camera data was used.";
+        doc.getElementById("diagnostics").hidden = true;
+        doc.getElementById("error").hidden = true;
+      }
+      run.disabled = false;
+    }
+  });
+  document.getElementById("audio").addEventListener("click", async () => {
+    const audio = new AudioCues();
+    const output = document.getElementById("audio-result");
+    try {
+      if (!await audio.unlock() || !audio.play(1)) throw new Error("Browser did not enable audio output");
+      const deadline = performance.now() + 3000;
+      while (audio.voices.size > 0 && performance.now() < deadline) await wait(50);
+      if (audio.voices.size !== 0) throw new Error(`Finished tones did not release their nodes (state ${audio.context?.state}, audio clock ${audio.context?.currentTime.toFixed(3)}s)`);
+      output.textContent = "PASS: browser AudioContext resumed; a quiet synthesized sine tone played and released its nodes. Audibility still needs your listening check.";
+    } catch (error) { output.textContent = `FAIL: ${error.message}`; }
+    finally { await audio.close(); }
+  });
+</script></body></html>

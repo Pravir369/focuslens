@@ -1,0 +1,22 @@
+:root { color-scheme: light; font: 16px/1.55 system-ui, sans-serif; color: #20332b; background: #f1f6f2; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; }
+main { width: min(100% - 32px, 620px); margin: 56px auto; }
+h1 { font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.15; letter-spacing: -.045em; margin: 12px 0 24px; }
+h2 { font-size: 1.3rem; margin: 24px 0 16px; }
+.eyebrow { text-transform: uppercase; font-weight: 750; letter-spacing: .12em; font-size: .8rem; }
+.intro, .muted { color: #52645b; }
+.notice { border-left: 3px solid #8caa96; padding: 8px 16px; font-size: .9rem; }
+.card { background: #fff; border: 1px solid #d7e2d9; border-radius: 16px; padding: 28px; box-shadow: 0 8px 28px #254d3010; margin-top: 20px; }
+label { display: block; font-weight: 600; margin-top: 16px; }
+input, select { width: 100%; padding: 12px; border: 1px solid #8c9f92; border-radius: 6px; font: inherit; background: #fff; color: inherit; margin-top: 6px; }
+button { cursor: pointer; padding: 12px 20px; border: 1px solid #28664e; border-radius: 6px; font: inherit; font-weight: 600; color: white; background: #28664e; }
+form > button { margin-top: 24px; width: 100%; }
+button:disabled { cursor: wait; opacity: .6; }
+.tabs { display: flex; gap: 12px; flex-wrap: wrap; }
+.tabs button[aria-pressed="false"] { background: white; color: #28664e; }
+:focus-visible { outline: 3px solid #91b8fc; outline-offset: 3px; }
+#account-error { color: #8a2828; background: #fff0ec; padding: 14px; border-radius: 6px; }
+.muted { font-size: .9rem; }
+@media (max-width: 450px) { main { margin-top: 28px; } .card { padding: 20px; } }

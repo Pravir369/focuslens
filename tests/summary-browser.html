@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FocusLens · Summary insight checks</title><link rel="icon" href="data:,"><link rel="stylesheet" href="../styles.css?v=7.4"></head>
+<body><main>
+  <h1>Summary insight checks</h1>
+  <p>Production summary with synthetic, frozen event records. No camera, model, sound, or storage is used.</p>
+  <button id="run" type="button">Run summary checks</button>
+  <label for="scenario">Preview a synthetic session</label>
+  <select id="scenario" disabled><option value="phone">Mixed session · phones from A and B</option><option value="window">App-name pattern</option><option value="drowsy">Drowsy pattern</option><option value="lookAway">Look-away pattern</option><option value="none">No distractions</option><option value="noRecovery">No recoveries</option><option value="empty">No classified time</option></select>
+  <button id="narrow" type="button">Narrow preview</button>
+  <p id="result" role="status">Ready.</p>
+  <iframe id="app" title="Production summary with synthetic session records" style="width:100%;height:1300px;border:1px solid #dce2db"></iframe>
+</main><script type="module">
+  import { renderSessionSummary } from "../js/summary.js?v=7";
+  const get = (id) => document.getElementById(id);
+  const frame = get("app");
+  let doc;
+  const deepFreeze = (value) => { if (value && typeof value === "object") { Object.values(value).forEach(deepFreeze); Object.freeze(value); } return value; };
+  function simple(steps, goalEngagementPct = 80) {
+    let at = 0;
+    const events = steps.map(([type, duration, triggerSource]) => {
+      const start = at; at += duration;
+      return { type, start, end: at, duration, ...(triggerSource ? { triggerSource } : {}) };
+    });
+    return deepFreeze({ state: "ended", goalMinutes: 25, goalEngagementPct, phonePolicy: "phone-free", endReason: "ended-early", startTime: 0, endTime: at,
+      events, activeSegments: [{ start: 0, end: at, eventStartIndex: 0, eventEndIndex: events.length }], unclassifiedPeriods: [], elapsedMs: () => at });
+  }
+  const mixed = simple([["engaged", 4000], ["distracted", 10000, "cameraA"], ["engaged", 5000], ["distracted", 6000], ["away", 4000], ["distracted", 10000, "cameraB"], ["drowsy", 5000], ["engaged", 9000]]);
+  // Add an initial wait, a missing reading inside B's distraction, and a pause.
+  const events = mixed.events.map((event, index) => ({ ...event, start: event.start + (index < 7 ? 1000 : 7000), end: event.end + (index < 7 ? 1000 : 7000) }));
+  const phone = deepFreeze({ ...mixed, events, endTime: 60000,
+    activeSegments: [{ start: 0, end: 45000, eventStartIndex: 0, eventEndIndex: 7 }, { start: 50000, end: 60000, eventStartIndex: 7, eventEndIndex: 8 }],
+    unclassifiedPeriods: [{ start: 0, end: 1000 }, { start: 35000, end: 36000 }, { start: 50000, end: 51000 }], elapsedMs: () => 55000 });
+  const scenarios = {
+    phone,
+    window: simple([["engaged", 3000], ["distracted", 9000, "window"], ["engaged", 10000]]),
+    drowsy: simple([["drowsy", 2000], ["engaged", 5000], ["drowsy", 2000], ["engaged", 5000]]),
+    lookAway: simple([["engaged", 3000], ["distracted", 1000], ["engaged", 3000], ["distracted", 2000], ["engaged", 3000]]),
+    none: simple([["engaged", 60000]]),
+    noRecovery: simple([["distracted", 5000, "cameraB"], ["away", 1000]]),
+    empty: simple([]),
+  };
+  function render(name) {
+    renderSessionSummary(doc, scenarios[name]);
+    doc.getElementById("summary-save-status").textContent = "Synthetic preview only. No history was saved.";
+  }
+  get("scenario").addEventListener("change", () => { if (doc) render(get("scenario").value); });
+  get("narrow").addEventListener("click", () => { frame.style.maxWidth = frame.style.maxWidth ? "" : "375px"; });
+  get("run").addEventListener("click", async () => {
+    get("run").disabled = true;
+    let checks = 0;
+    const check = (condition, message) => { if (!condition) throw new Error(message); checks++; };
+    try {
+      const page = new DOMParser().parseFromString(await fetch("../index.html").then((r) => r.text()), "text/html");
+      page.querySelectorAll("script").forEach((node) => node.remove());
+      const base = page.createElement("base"); base.href = new URL("../", location.href).href; page.head.prepend(base);
+      const loaded = new Promise((resolve) => { frame.onload = resolve; }); frame.srcdoc = page.documentElement.outerHTML; await loaded;
+      doc = frame.contentDocument;
+      doc.querySelectorAll("[data-view]").forEach((view) => { view.hidden = view.dataset.view !== "summary"; });
+      doc.getElementById("status").textContent = "Synthetic summary preview. No camera data was used.";
+      const text = (id) => doc.getElementById(id).textContent;
+      const before = JSON.stringify(scenarios);
+      render("phone");
+      check(text("summary-pattern").includes("phone-related"), "Phone tip missing");
+      check(text("summary-recovery") === "You got back on track in about 10 seconds on average.", "Recovery sentence must retain the qualifying 10-second average");
+      check(text("summary-engagement") === "You were engaged for 37.5% of classified study time, against your 80% goal.", "Engagement sentence must retain the classified-time denominator and target");
+      check(text("summary-distractions") === "3 moments of distraction this session.", "Distraction sentence must retain event count");
+      check(text("summary-longest") === "Your longest distraction lasted about 10 seconds.", "Longest sentence must use distraction time, not away or pause time");
+      check(text("summary-goal").startsWith("Below your goal"), "Below-goal sentence must be preserved");
+      check(doc.querySelector('.summary-stats').nextElementSibling.id === "summary-pattern" && doc.getElementById("summary-pattern").nextElementSibling.textContent === "Session timeline", "Tip must sit immediately after headline stats and before the timeline");
+      check(doc.querySelectorAll('#timeline .phone-catch[data-trigger-source="cameraA"]').length === 1, "Camera A marker missing");
+      check(doc.querySelectorAll('#timeline .phone-catch[data-trigger-source="cameraB"]').length === 2, "Camera B markers must split around missing readings");
+      check(doc.querySelectorAll('#timeline [data-state="distracted"]:not(.phone-catch)').length === 1, "Plain look-away must stay unmarked");
+      check(!doc.querySelector('#timeline .phone-catch:not([data-state="distracted"])'), "Away, drowsy, paused, or unknown segments must not get a phone marker");
+      check([...doc.querySelectorAll('#timeline > span')].reduce((sum, node) => sum + Number(node.style.flexGrow), 0) === 60000, "Markers must not change timeline duration");
+      check(doc.defaultView.getComputedStyle(doc.querySelector('#timeline .phone-catch')).boxShadow !== "none", "Phone marker must be visibly styled");
+      check(text("timeline-rows").includes("Camera B (desk)") && doc.querySelector('.legend .phone-catch'), "Source details and marker legend missing");
+      render("window");
+      check(text("summary-pattern").includes("an app outside your study list"), "App-specific pattern missing");
+      check(doc.querySelectorAll('#timeline .window-catch').length === 1 && doc.querySelectorAll('#timeline .phone-catch').length === 0, "App catch must have its own marker, not a phone marker");
+      check(text("summary-window-sources").includes("1 distraction") && text("summary-phone-sources") === "", "App event must not inflate phone counts");
+      check(text("timeline-rows").includes("Active app") && doc.defaultView.getComputedStyle(doc.querySelector('#timeline .window-catch')).boxShadow !== "none", "App source must be accessible and visibly marked");
+      render("drowsy"); check(text("summary-pattern").includes("session-timing issue"), "Drowsy tip missing");
+      render("lookAway"); check(text("summary-pattern").includes("brief look-aways"), "Look-away tip missing");
+      check(text("summary-recovery").includes("1.5 seconds on average") && text("summary-goal").startsWith("Close"), "Recovery precision and near-goal framing must be preserved");
+      render("none"); check(text("summary-pattern") === "No distractions logged this session.", "Positive message missing");
+      check(text("summary-recovery") === "No distractions this session" && text("summary-goal") === "You hit your goal.", "No-distraction and passing-goal messages must be preserved");
+      check(doc.querySelectorAll('#timeline .phone-catch').length === 0, "Old phone markers must clear on another summary");
+      render("noRecovery"); check(text("summary-recovery") === "No recoveries recorded", "Missing recoveries must not become a fabricated average");
+      check(text("summary-distractions") === "1 moment of distraction this session.", "Single distraction needs singular wording");
+      render("empty"); check(text("summary-engagement").includes("No classified time") && doc.getElementById("timeline-empty").hidden === false, "Empty summary must preserve no-data behavior");
+      check(!text("summary-goal").includes("You hit") && !text("summary-engagement").includes("0%"), "No-data summary must not invent a percentage or pass");
+      const long = simple([["distracted", 61500], ["engaged", 1000]]);
+      renderSessionSummary(doc, long);
+      check(text("summary-recovery").includes("61.5 seconds on average"), "Sentence seconds must preserve recovery values over a minute");
+      check(JSON.stringify(scenarios) === before, "Summary rendering must not change event records or metadata");
+      render("phone"); get("scenario").value = "phone"; get("scenario").disabled = false;
+      get("result").textContent = `PASS: ${checks} summary checks. Synthetic records only; camera/classifier/logging code is not used or changed.`;
+    } catch (error) { get("result").textContent = `FAIL after ${checks} checks: ${error.message}`; }
+    finally { get("run").disabled = false; }
+  });
+</script></body></html>
