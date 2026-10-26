@@ -7,7 +7,7 @@
       "plan": "free",
       "region": "oregon",
       "branch": "main",
-      "autoDeployTrigger": "off",
+      "autoDeployTrigger": "commit",
       "buildCommand": "pip install -r requirements.txt",
       "startCommand": "python -m flask --app backend:create_app db upgrade && exec gunicorn 'backend:create_app()' --bind 0.0.0.0:$PORT --workers 1 --threads 4",
       "envVars": [
